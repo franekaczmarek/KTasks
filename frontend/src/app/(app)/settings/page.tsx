@@ -1,0 +1,103 @@
+"use client";
+
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { toast } from "sonner";
+
+import { PageHeader } from "@/components/page-header";
+import { SimpleSelect } from "@/components/simple-select";
+import { Badge } from "@/components/ui/badge";
+import { Button } from "@/components/ui/button";
+import { useMe, useUsers } from "@/hooks/use-me";
+import { api } from "@/lib/api";
+import type { AreaLead, User } from "@/lib/types";
+
+export default function SettingsPage() {
+  const { data: me } = useMe();
+  const { data: users = [] } = useUsers();
+  const queryClient = useQueryClient();
+  const { data: areaLeads = [] } = useQuery({
+    queryKey: ["area-leads"],
+    queryFn: () => api.get<AreaLead[]>("/area-leads"),
+  });
+  const leads = users.filter((u) => u.role === "lead");
+  const leadOptions = leads.map((l) => ({ value: l.id, label: l.name }));
+
+  const setAreaLead = useMutation({
+    mutationFn: ({ area, lead_id }: { area: string; lead_id: string }) =>
+      api.put<AreaLead[]>(`/area-leads/${area}`, { lead_id }),
+    onSuccess: (data) => {
+      queryClient.setQueryData(["area-leads"], data);
+      toast.success("Area lead updated");
+    },
+    onError: (e) => toast.error(e.message),
+  });
+
+  const patchUser = useMutation({
+    mutationFn: ({ id, ...body }: { id: string; is_absent?: boolean; backup_lead_id?: string }) =>
+      api.patch<User>(`/users/${id}`, body),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["users"] });
+      queryClient.invalidateQueries({ queryKey: ["area-leads"] });
+      queryClient.invalidateQueries({ queryKey: ["me"] });
+      toast.success("Lead updated");
+    },
+    onError: (e) => toast.error(e.message),
+  });
+
+  if (me && me.role !== "lead") {
+    return <PageHeader title="Lead settings" description="Only Leads can manage area assignments." />;
+  }
+
+  return (
+    <div className="space-y-6">
+      <PageHeader title="Lead settings" description="Area ownership, absences and backup Leads." />
+
+      <section className="rounded-2xl bg-card p-6 shadow-sm">
+        <h2 className="mb-4 font-semibold text-az-navy">Area leads</h2>
+        <div className="divide-y">
+          {areaLeads.map((a) => (
+            <div key={a.area} className="flex flex-wrap items-center gap-4 py-3" data-testid={`area-${a.area}`}>
+              <div className="w-36 font-medium">{a.area}</div>
+              <SimpleSelect className="w-56" aria-label={`${a.area} lead`} value={a.lead_id} options={leadOptions}
+                onChange={(lead_id) => setAreaLead.mutate({ area: a.area, lead_id })} />
+              <div className="text-sm text-muted-foreground">
+                Routing to{" "}
+                <span className="font-medium text-foreground" data-testid="effective-lead">{a.effective_lead_name}</span>
+                {a.lead_absent && <Badge className="ml-2 rounded-full bg-amber-100 text-amber-800">Backup active</Badge>}
+              </div>
+            </div>
+          ))}
+        </div>
+      </section>
+
+      <section className="rounded-2xl bg-card p-6 shadow-sm">
+        <h2 className="mb-4 font-semibold text-az-navy">Leads &amp; absences</h2>
+        <div className="divide-y">
+          {leads.map((l) => (
+            <div key={l.id} className="flex flex-wrap items-center gap-4 py-3" data-testid={`lead-${l.email}`}>
+              <div className="w-48">
+                <div className="font-medium">{l.name}</div>
+                <div className="text-xs text-muted-foreground">{l.email}</div>
+              </div>
+              <div className="flex items-center gap-2 text-sm">
+                <span className="text-muted-foreground">Backup:</span>
+                <SimpleSelect className="w-48" aria-label={`${l.name} backup`} value={l.backup_lead_id}
+                  placeholder="None" options={leadOptions.filter((o) => o.value !== l.id)}
+                  onChange={(backup_lead_id) => patchUser.mutate({ id: l.id, backup_lead_id })} />
+              </div>
+              <div className="ml-auto flex items-center gap-3">
+                {l.is_absent
+                  ? <Badge className="rounded-full bg-amber-100 text-amber-800">Absent</Badge>
+                  : <Badge className="rounded-full bg-emerald-100 text-emerald-800">Available</Badge>}
+                <Button variant="outline" size="sm" disabled={patchUser.isPending}
+                  onClick={() => patchUser.mutate({ id: l.id, is_absent: !l.is_absent })}>
+                  {l.is_absent ? "Mark available" : "Mark absent"}
+                </Button>
+              </div>
+            </div>
+          ))}
+        </div>
+      </section>
+    </div>
+  );
+}
