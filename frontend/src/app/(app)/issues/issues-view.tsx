@@ -7,6 +7,7 @@ import { useState } from "react";
 import { IssueDrawer } from "@/components/issues/issue-drawer";
 import { IssuesTable } from "@/components/issues/issues-table";
 import { NewIssueDialog } from "@/components/issues/new-issue-dialog";
+import { ResolutionPanel } from "@/components/issues/resolution-panel";
 import { PageHeader } from "@/components/page-header";
 import { SimpleSelect } from "@/components/simple-select";
 import { Skeleton } from "@/components/ui/skeleton";
@@ -69,7 +70,9 @@ export function IssuesView() {
       ) : (
         <IssuesTable issues={issues} onSelect={select} />
       )}
-      <IssueDrawer issueId={selected} onClose={() => select(null)} />
+      <IssueDrawer issueId={selected} onClose={() => select(null)}>
+        {(issue) => <ResolutionPanel issue={issue} />}
+      </IssueDrawer>
     </>
   );
 }

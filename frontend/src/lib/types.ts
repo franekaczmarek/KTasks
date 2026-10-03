@@ -50,6 +50,7 @@ export interface Metrics {
   is_blocked: boolean;
   red_alert: boolean;
   task_counts: Record<TaskStatus, number>;
+  auto_close_at: string | null;
 }
 
 export interface Blocker {

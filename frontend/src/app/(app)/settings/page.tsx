@@ -44,6 +44,15 @@ export default function SettingsPage() {
     onError: (e) => toast.error(e.message),
   });
 
+  const autoClose = useMutation({
+    mutationFn: () => api.post<{ closed: number[] }>("/admin/run-auto-close"),
+    onSuccess: ({ closed }) => {
+      queryClient.invalidateQueries({ queryKey: ["issues"] });
+      toast.success(closed.length ? `Auto-closed ${closed.map((i) => `KT-${i}`).join(", ")}` : "No issues due for auto-close");
+    },
+    onError: (e) => toast.error(e.message),
+  });
+
   if (me && me.role !== "lead") {
     return <PageHeader title="Lead settings" description="Only Leads can manage area assignments." />;
   }
@@ -97,6 +106,19 @@ export default function SettingsPage() {
             </div>
           ))}
         </div>
+      </section>
+
+      <section className="flex flex-wrap items-center gap-4 rounded-2xl bg-card p-6 shadow-sm">
+        <div className="flex-1">
+          <h2 className="font-semibold text-az-navy">Auto-close</h2>
+          <p className="text-sm text-muted-foreground">
+            Resolved issues close automatically after 5 business days without reporter confirmation. The check runs
+            hourly; you can trigger it now.
+          </p>
+        </div>
+        <Button variant="outline" disabled={autoClose.isPending} onClick={() => autoClose.mutate()}>
+          Run auto-close check
+        </Button>
       </section>
     </div>
   );
