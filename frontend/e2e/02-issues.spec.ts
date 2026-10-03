@@ -1,13 +1,9 @@
-import { expect, type Page, test } from "@playwright/test";
+import { expect, test } from "@playwright/test";
 
-import { login, trackConsoleErrors, USERS } from "./helpers";
+import { choose, login, trackConsoleErrors, USERS } from "./helpers";
 
 const TITLE = `[e2e] Conveyor belt sensor misreads pallets ${Date.now()}`;
 
-async function choose(page: Page, label: string, option: string) {
-  await page.getByRole("combobox", { name: label }).click();
-  await page.getByRole("option", { name: option, exact: true }).click();
-}
 
 test.describe.serial("Issues tab", () => {
   let issueId: string;

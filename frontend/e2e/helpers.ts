@@ -24,3 +24,27 @@ export async function login(page: Page, email: string) {
   await page.getByRole("button", { name: "Sign in" }).click();
   await expect(page).toHaveURL(/\/issues/);
 }
+
+export async function choose(page: Page, label: string, option: string) {
+  await page.getByRole("combobox", { name: label }).click();
+  await page.getByRole("option", { name: option, exact: true }).click();
+}
+
+/** Creates an issue through the UI and returns its numeric id (drawer is left open). */
+export async function createIssue(
+  page: Page,
+  title: string,
+  { area = "Operations", priority = "Medium", effort = "Low", summary = "" } = {},
+): Promise<number> {
+  await page.goto("/issues");
+  await page.getByRole("button", { name: "Report issue" }).click();
+  const dialog = page.getByRole("dialog");
+  await dialog.getByLabel("Title").fill(title);
+  if (summary) await dialog.getByLabel("Summary").fill(summary);
+  await choose(page, "Area", area);
+  await choose(page, "Priority", priority);
+  await choose(page, "Estimated effort", effort);
+  await dialog.getByRole("button", { name: "Submit issue" }).click();
+  await expect(page).toHaveURL(/\?issue=\d+/);
+  return Number(new URL(page.url()).searchParams.get("issue"));
+}

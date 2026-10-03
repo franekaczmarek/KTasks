@@ -122,3 +122,29 @@ export interface DuplicateHit {
   lead_name: string | null;
   score: number;
 }
+
+export interface DiscussionEntry {
+  id: number;
+  title: string;
+  status: IssueStatus;
+  priority: Priority;
+  area: Area;
+  last_comment: string | null;
+  last_comment_by: string | null;
+  last_comment_at: string | null;
+  last_activity_at: string;
+  is_participant: boolean;
+  unread_count: number;
+}
+
+export interface Comment {
+  id: number;
+  issue_id: number;
+  user_id: string;
+  user_name: string;
+  user_role: Role;
+  content: string;
+  created_at: string;
+  updated_at: string;
+  is_edited: boolean;
+}

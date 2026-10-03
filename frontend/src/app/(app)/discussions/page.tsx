@@ -1,5 +1,11 @@
-import { PageHeader } from "@/components/page-header";
+import { Suspense } from "react";
 
-export default function Page() {
-  return <PageHeader title="Discussions" description="Conversations on every active issue." />;
+import { DiscussionsView } from "./discussions-view";
+
+export default function DiscussionsPage() {
+  return (
+    <Suspense>
+      <DiscussionsView />
+    </Suspense>
+  );
 }
