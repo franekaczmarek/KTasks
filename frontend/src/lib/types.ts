@@ -148,3 +148,39 @@ export interface Comment {
   updated_at: string;
   is_edited: boolean;
 }
+
+export const TASK_COLUMNS: { status: TaskStatus; label: string }[] = [
+  { status: "ToDo", label: "To Do" },
+  { status: "InProgress", label: "In Progress" },
+  { status: "Done", label: "Done" },
+];
+
+export interface Task {
+  id: number;
+  issue_id: number;
+  title: string;
+  summary: string;
+  status: TaskStatus;
+  assignee_id: string | null;
+  assignee_name: string | null;
+  position: number;
+  created_at: string;
+  updated_at: string;
+  issue_title: string;
+  issue_status: IssueStatus;
+  issue_priority: Priority;
+  issue_blocked: boolean;
+}
+
+export interface TaskTemplate {
+  id: number;
+  title: string;
+  summary: string;
+}
+
+export interface MoveResult {
+  task: Task;
+  issue_status: IssueStatus;
+  issue_started: boolean;
+  completion_prompt: boolean;
+}

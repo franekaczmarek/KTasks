@@ -1,5 +1,11 @@
-import { PageHeader } from "@/components/page-header";
+import { Suspense } from "react";
 
-export default function Page() {
-  return <PageHeader title="Work" description="Kanban boards and task templates." />;
+import { WorkView } from "./work-view";
+
+export default function WorkPage() {
+  return (
+    <Suspense>
+      <WorkView />
+    </Suspense>
+  );
 }
