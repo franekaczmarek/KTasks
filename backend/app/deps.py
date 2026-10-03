@@ -28,6 +28,9 @@ def verify_token(token: str) -> dict[str, Any]:
             algorithms=["ES256", "RS256"],
             audience="authenticated",
             issuer=f"{get_settings().supabase_url}/auth/v1",
+            # iat has 1s resolution and comes from the auth server's clock; without leeway a
+            # freshly issued token is intermittently rejected as "not yet valid".
+            leeway=30,
         )
     except jwt.PyJWTError as exc:
         raise HTTPException(status.HTTP_401_UNAUTHORIZED, f"Invalid token: {exc}") from exc
