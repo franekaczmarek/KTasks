@@ -2,6 +2,7 @@ import Link from "next/link";
 
 import { CommandPalette } from "./command-palette";
 import { NavTabs } from "./nav-tabs";
+import { NotificationBell } from "./notification-bell";
 import { UserMenu } from "./user-menu";
 
 export function TopBar() {
@@ -17,7 +18,7 @@ export function TopBar() {
         <NavTabs />
         <div className="ml-auto flex items-center gap-3">
           <CommandPalette />
-          {/* Notification bell is added in Step 8 */}
+          <NotificationBell />
           <UserMenu />
         </div>
       </div>
