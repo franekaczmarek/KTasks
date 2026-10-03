@@ -185,3 +185,30 @@ export interface MoveResult {
   issue_started: boolean;
   completion_prompt: boolean;
 }
+
+export interface DashboardData {
+  scope: { area: Area | null; days: number | null; issue_count: number; generated_at: string };
+  kpis: {
+    avg_lead_response_days: number | null;
+    responded_count: number;
+    awaiting_response: number;
+    open_issues: number;
+    open_blocked: number;
+    open_breached: number;
+    sla_compliance_pct: number | null;
+    sla_finished_count: number;
+    sla_met_count: number;
+  };
+  status_counts: Record<IssueStatus, number>;
+  quick_wins: {
+    priority: Priority; effort: Effort; count: number; quick_win: boolean;
+    issues: { id: number; title: string; status: IssueStatus }[];
+  }[];
+  root_causes: { root_cause: RootCause; count: number }[];
+  blockers: {
+    total_days: number;
+    active: number;
+    avg_days_per_blocked_issue: number | null;
+    top_reasons: { reason: string; count: number; days: number }[];
+  };
+}
