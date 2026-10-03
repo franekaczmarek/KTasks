@@ -1,11 +1,14 @@
+import os
 from functools import cache
 
 import httpx
 import pytest
 from fastapi.testclient import TestClient
 
-from app.config import get_settings
-from app.main import app
+os.environ["KTASKS_DISABLE_SCHEDULER"] = "1"
+
+from app.config import get_settings  # noqa: E402
+from app.main import app  # noqa: E402
 
 LEAD = "anna.lead@ktasks.dev"
 LEAD2 = "marek.lead@ktasks.dev"

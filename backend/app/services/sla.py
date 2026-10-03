@@ -3,7 +3,7 @@ from datetime import UTC, datetime
 from typing import Any
 
 from app.config import get_settings
-from app.services.business_days import DAY_SECONDS, business_seconds, business_seconds_union
+from app.services.business_days import DAY_SECONDS, add_business_days, business_seconds, business_seconds_union
 
 
 def now() -> datetime:
@@ -66,4 +66,7 @@ def compute_metrics(
                         "Done": counts.get("Done", 0)},
         # Red Alert: work is "In Progress" but nothing is scheduled (all tasks Done, none To Do).
         "red_alert": issue["status"] == "In Progress" and total_tasks > 0 and open_tasks == 0,
+        # Two-stage closure: when an unconfirmed resolution closes automatically.
+        "auto_close_at": (add_business_days(issue["resolved_at"], s.auto_close_business_days)
+                          if issue["status"] == "Resolved" and issue.get("resolved_at") else None),
     }

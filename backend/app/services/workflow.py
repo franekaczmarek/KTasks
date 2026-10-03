@@ -1,10 +1,13 @@
 """Issue status workflow: task-driven auto-sync, resolution and closure."""
+from datetime import datetime, timedelta
 from typing import Any
 
 from fastapi import HTTPException
 from sqlalchemy import Connection
 
-from app.db import execute, fetch_one
+from app.config import get_settings
+from app.db import execute, fetch_all, fetch_one
+from app.services.business_days import add_business_days
 from app.services.activity import log_activity
 from app.services.notifications import notify
 from app.services.sla import now
@@ -54,3 +57,42 @@ def resolve_issue(conn: Connection, issue: dict[str, Any], user: dict[str, Any],
     notify(conn, [issue["creator_id"]], "verification_request",
            f"KT-{issue['id']} was resolved: please confirm the resolution of \"{issue['title']}\"",
            issue_id=issue["id"], link=f"/issues?issue={issue['id']}")
+
+
+def confirm_resolution(conn: Connection, issue: dict[str, Any], user: dict[str, Any], background=None) -> None:
+    """Stage 2: the reporting employee confirms -> Closed, with accountability fields."""
+    if str(issue["creator_id"]) != str(user["id"]):
+        raise HTTPException(403, "Only the employee who reported the issue can confirm its resolution")
+    if issue["status"] != "Resolved":
+        raise HTTPException(409, f"Only Resolved issues can be confirmed (current: {issue['status']})")
+    execute(conn, "update public.issues set status = 'Closed', closed_by_user_id = :u, closed_at = :t where id = :id",
+            u=user["id"], t=now(), id=issue["id"])
+    log_activity(conn, issue["id"], user["id"], "closed", confirmed_by=user["name"])
+    notify(conn, [issue["lead_id"]], "resolution_confirmed",
+           f"{user['name']} confirmed the resolution of KT-{issue['id']}: {issue['title']}",
+           issue_id=issue["id"], link=f"/issues?issue={issue['id']}", exclude=user["id"],
+           email_leads=True, background=background, subject=f"[KTasks] KT-{issue['id']} closed: resolution confirmed")
+
+
+def auto_close_due(conn: Connection, at: datetime | None = None) -> list[int]:
+    """Close Resolved issues whose reporter hasn't confirmed within N business days."""
+    at = at or now()
+    days = get_settings().auto_close_business_days
+    # 5 business days always span at least 5 calendar days: cheap SQL pre-filter, exact check in Python.
+    candidates = fetch_all(
+        conn,
+        "select * from public.issues where status = 'Resolved' and resolved_at <= :cutoff for update skip locked",
+        cutoff=at - timedelta(days=days),
+    )
+    closed = []
+    for issue in candidates:
+        if add_business_days(issue["resolved_at"], days) > at:
+            continue
+        execute(conn, "update public.issues set status = 'Closed', closed_at = :t, closed_by_user_id = null "
+                      "where id = :id", t=at, id=issue["id"])
+        log_activity(conn, issue["id"], None, "auto_closed", business_days=days)
+        notify(conn, [issue["creator_id"], issue["lead_id"]], "auto_closed",
+               f"KT-{issue['id']} was closed automatically: no confirmation within {days} business days",
+               issue_id=issue["id"], link=f"/issues?issue={issue['id']}")
+        closed.append(issue["id"])
+    return closed

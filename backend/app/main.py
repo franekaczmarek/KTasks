@@ -1,10 +1,22 @@
+from contextlib import asynccontextmanager
+
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
 from app.config import get_settings
-from app.routers import blockers, comments, issues, search, tasks, users
+from app.routers import admin, blockers, comments, issues, search, tasks, users
+from app.services.scheduler import start_scheduler
 
-app = FastAPI(title="KTasks API", version="0.1.0")
+
+@asynccontextmanager
+async def lifespan(_: FastAPI):
+    scheduler = start_scheduler()
+    yield
+    if scheduler:
+        scheduler.shutdown(wait=False)
+
+
+app = FastAPI(title="KTasks API", version="0.1.0", lifespan=lifespan)
 
 app.add_middleware(
     CORSMiddleware,
@@ -15,7 +27,7 @@ app.add_middleware(
     expose_headers=["Content-Disposition"],
 )
 
-for r in (users.router, search.router, issues.router, blockers.router, comments.router, tasks.router):
+for r in (users.router, search.router, issues.router, blockers.router, comments.router, tasks.router, admin.router):
     app.include_router(r)
 
 
