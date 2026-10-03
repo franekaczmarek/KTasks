@@ -33,7 +33,8 @@ def verify_token(token: str) -> dict[str, Any]:
         raise HTTPException(status.HTTP_401_UNAUTHORIZED, f"Invalid token: {exc}") from exc
 
 
-DB = Annotated[Connection, Depends(get_db)]
+# scope="function": commit before the response is sent, so clients never read stale data.
+DB = Annotated[Connection, Depends(get_db, scope="function")]
 
 
 def current_user(db: DB, authorization: Annotated[str | None, Header()] = None) -> dict[str, Any]:
