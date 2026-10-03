@@ -2,7 +2,7 @@ from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
 from app.config import get_settings
-from app.routers import blockers, comments, issues, search, users
+from app.routers import blockers, comments, issues, search, tasks, users
 
 app = FastAPI(title="KTasks API", version="0.1.0")
 
@@ -15,7 +15,7 @@ app.add_middleware(
     expose_headers=["Content-Disposition"],
 )
 
-for r in (users.router, search.router, issues.router, blockers.router, comments.router):
+for r in (users.router, search.router, issues.router, blockers.router, comments.router, tasks.router):
     app.include_router(r)
 
 
