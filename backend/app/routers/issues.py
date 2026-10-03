@@ -24,8 +24,10 @@ Effort = Literal["Low", "Medium", "High"]
 MAX_FILES, MAX_FILE_BYTES = 5, 10 * 1024 * 1024
 
 
-def issue_or_404(db, issue_id: int) -> dict[str, Any]:
-    issue = fetch_one(db, "select * from public.issues where id = :id", id=issue_id)
+def issue_or_404(db, issue_id: int, lock: bool = False) -> dict[str, Any]:
+    """lock=True takes a row lock so concurrent workflow changes on one issue are serialized."""
+    sql = "select * from public.issues where id = :id" + (" for update" if lock else "")
+    issue = fetch_one(db, sql, id=issue_id)
     if issue is None:
         raise HTTPException(404, "Issue not found")
     return issue
@@ -232,7 +234,7 @@ class IssuePatch(BaseModel):
 
 @router.patch("/{issue_id}")
 def update_issue(issue_id: int, body: IssuePatch, db: DB, user: LeadUser, background: BackgroundTasks):
-    issue = issue_or_404(db, issue_id)
+    issue = issue_or_404(db, issue_id, lock=True)
     if issue["status"] == "Closed":
         raise HTTPException(409, "Closed issues cannot be edited")
     changes = {k: v for k, v in body.model_dump(exclude_unset=True).items() if v != issue[k]}

@@ -95,7 +95,7 @@ def task_templates(db: DB, _: CurrentUser):
 
 @router.post("/issues/{issue_id}/tasks", status_code=201)
 def create_task(issue_id: int, body: TaskIn, db: DB, user: CurrentUser):
-    issue = issue_or_404(db, issue_id)
+    issue = issue_or_404(db, issue_id, lock=True)
     if not can_manage(user, issue):
         raise HTTPException(403, "Only the creator or a Lead can add tasks")
     ensure_open(issue)
@@ -117,7 +117,7 @@ def create_task(issue_id: int, body: TaskIn, db: DB, user: CurrentUser):
 
 @router.post("/issues/{issue_id}/tasks/from-templates", status_code=201)
 def apply_templates(issue_id: int, body: TemplatesIn, db: DB, user: LeadUser):
-    issue = issue_or_404(db, issue_id)
+    issue = issue_or_404(db, issue_id, lock=True)
     ensure_open(issue)
     rows = fetch_all(
         db,
@@ -138,7 +138,7 @@ def apply_templates(issue_id: int, body: TemplatesIn, db: DB, user: LeadUser):
 @router.patch("/tasks/{task_id}")
 def update_task(task_id: int, body: TaskPatch, db: DB, user: CurrentUser):
     task = task_or_404(db, task_id)
-    issue = issue_or_404(db, task["issue_id"])
+    issue = issue_or_404(db, task["issue_id"], lock=True)
     if not can_work_on(user, issue, task):
         raise HTTPException(403, "Not allowed to edit this task")
     ensure_open(issue)
@@ -156,7 +156,8 @@ def update_task(task_id: int, body: TaskPatch, db: DB, user: CurrentUser):
 @router.patch("/tasks/{task_id}/move")
 def move_task(task_id: int, body: TaskMove, db: DB, user: CurrentUser):
     task = task_or_404(db, task_id)
-    issue = issue_or_404(db, task["issue_id"])
+    issue = issue_or_404(db, task["issue_id"], lock=True)
+    task = task_or_404(db, task_id)  # re-read under the issue lock
     if not can_work_on(user, issue, task):
         raise HTTPException(403, "Only the creator, a Lead or the assignee can move this task")
     ensure_open(issue)
@@ -178,7 +179,7 @@ def move_task(task_id: int, body: TaskMove, db: DB, user: CurrentUser):
 @router.delete("/tasks/{task_id}", status_code=204)
 def delete_task(task_id: int, db: DB, user: CurrentUser):
     task = task_or_404(db, task_id)
-    issue = issue_or_404(db, task["issue_id"])
+    issue = issue_or_404(db, task["issue_id"], lock=True)
     if not can_manage(user, issue):
         raise HTTPException(403, "Only the creator or a Lead can delete tasks")
     ensure_open(issue)
@@ -189,7 +190,7 @@ def delete_task(task_id: int, db: DB, user: CurrentUser):
 @router.post("/issues/{issue_id}/resolve")
 def resolve(issue_id: int, body: ResolveIn, db: DB, user: CurrentUser):
     """'Are all works on this issue completed?' -> YES (requires a root cause)."""
-    issue = issue_or_404(db, issue_id)
+    issue = issue_or_404(db, issue_id, lock=True)
     is_assignee = fetch_one(db, "select 1 from public.tasks where issue_id = :i and assignee_id = :u",
                             i=issue_id, u=user["id"])
     if user["role"] != "lead" and not is_assignee:

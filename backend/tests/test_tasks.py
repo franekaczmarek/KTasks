@@ -131,3 +131,16 @@ def test_swimlane_move_reassigns(client, make_issue, users):
     all_tasks = client.get("/tasks", headers=auth(EMPLOYEE)).json()
     mine = next(x for x in all_tasks if x["id"] == t["id"])
     assert mine["issue_title"].endswith("Swimlanes") and mine["issue_status"] == "In Progress"
+
+
+def test_concurrent_last_moves_still_prompt(client, make_issue):
+    """Two tasks finished at the same time: exactly one move must report the completion prompt."""
+    from concurrent.futures import ThreadPoolExecutor
+
+    iid = make_issue(title="Concurrent finish")["id"]
+    tasks = [add_task(client, iid, f"Parallel {n}") for n in range(3)]
+    for t in tasks:
+        move(client, t["id"], "InProgress")
+    with ThreadPoolExecutor(max_workers=3) as pool:
+        results = list(pool.map(lambda t: move(client, t["id"], "Done"), tasks))
+    assert sum(r["completion_prompt"] for r in results) == 1
