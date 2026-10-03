@@ -26,3 +26,99 @@ export interface SearchResults {
   tasks: { id: number; title: string; status: string; issue_id: number; issue_title: string }[];
   discussions: { issue_id: number; issue_title: string; snippet: string }[];
 }
+
+export type Priority = "Low" | "Medium" | "High" | "Critical";
+export type Effort = "Low" | "Medium" | "High";
+export type IssueStatus = "New" | "In Progress" | "Resolved" | "Closed";
+export type RootCause = "Procedure" | "Human Error" | "IT/Equipment" | "Training" | "Vendor" | "Other";
+export type TaskStatus = "ToDo" | "InProgress" | "Done";
+export type SlaState = "on_track" | "at_risk" | "breached" | "met";
+
+export const PRIORITIES: Priority[] = ["Low", "Medium", "High", "Critical"];
+export const EFFORTS: Effort[] = ["Low", "Medium", "High"];
+export const STATUSES: IssueStatus[] = ["New", "In Progress", "Resolved", "Closed"];
+export const ROOT_CAUSES: RootCause[] = ["Procedure", "Human Error", "IT/Equipment", "Training", "Vendor", "Other"];
+
+export interface Metrics {
+  lead_time_days: number;
+  cycle_time_days: number | null;
+  blocker_time_days: number;
+  active_work_days: number | null;
+  sla_target_days: number;
+  sla_used_pct: number;
+  sla_state: SlaState;
+  is_blocked: boolean;
+  red_alert: boolean;
+  task_counts: Record<TaskStatus, number>;
+}
+
+export interface Blocker {
+  id: number;
+  issue_id: number;
+  reason: string;
+  created_at: string;
+  resolved_at: string | null;
+  created_by_user_id: string | null;
+  created_by_name: string | null;
+  is_active: boolean;
+}
+
+export interface Issue {
+  id: number;
+  title: string;
+  summary: string;
+  area: Area;
+  priority: Priority;
+  effort: Effort;
+  root_cause: RootCause | null;
+  status: IssueStatus;
+  created_at: string;
+  updated_at: string;
+  start_date: string | null;
+  expected_end_date: string | null;
+  creator_id: string;
+  creator_name: string;
+  lead_id: string | null;
+  lead_name: string | null;
+  resolved_at: string | null;
+  resolved_by_user_id: string | null;
+  resolved_by_name: string | null;
+  closed_by_user_id: string | null;
+  closed_by_name: string | null;
+  closed_at: string | null;
+  metrics: Metrics;
+  blockers: Blocker[];
+}
+
+export interface Attachment {
+  id: number;
+  filename: string;
+  mime: string | null;
+  size: number | null;
+  created_at: string;
+  url: string | null;
+}
+
+export interface IssueDetail extends Issue {
+  attachments: Attachment[];
+  participants: { id: string; name: string; role: Role }[];
+}
+
+export interface ActivityEntry {
+  id: number;
+  action_type: string;
+  details: Record<string, unknown>;
+  created_at: string;
+  user_id: string | null;
+  user_name: string | null;
+}
+
+export interface DuplicateHit {
+  id: number;
+  title: string;
+  status: IssueStatus;
+  area: Area;
+  priority: Priority;
+  lead_name: string | null;
+  score: number;
+}

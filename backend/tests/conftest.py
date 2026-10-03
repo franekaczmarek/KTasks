@@ -63,19 +63,12 @@ def sent_emails(monkeypatch):
 
 @pytest.fixture(scope="session", autouse=True)
 def cleanup_test_issues():
-    """Delete every issue created by tests (cascades to tasks, comments, notifications...) + their files."""
+    """Delete every issue created by tests (cascades to child rows) plus stored files."""
+    from scripts.cleanup_test_data import cleanup
+
+    cleanup(TEST_TAG)
     yield
-    import psycopg
-
-    from app.services import storage
-
-    with psycopg.connect(get_settings().database_url) as conn:
-        paths = [r[0] for r in conn.execute(
-            "select a.storage_path from public.attachments a join public.issues i on i.id = a.issue_id "
-            "where i.title like %s", (f"{TEST_TAG}%",))]
-        conn.execute("delete from public.issues where title like %s", (f"{TEST_TAG}%",))
-        conn.execute("update public.users set is_absent = false")
-    storage.remove(paths)
+    cleanup(TEST_TAG)
 
 
 @pytest.fixture

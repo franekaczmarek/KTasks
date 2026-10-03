@@ -13,6 +13,8 @@ export default defineConfig({
   fullyParallel: false,
   workers: 1,
   reporter: [["list"]],
+  globalSetup: "./e2e/cleanup.ts",
+  globalTeardown: "./e2e/cleanup.ts",
   use: {
     baseURL: "http://localhost:3000",
     trace: "retain-on-failure",

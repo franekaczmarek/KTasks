@@ -1,5 +1,11 @@
-import { PageHeader } from "@/components/page-header";
+import { Suspense } from "react";
 
-export default function Page() {
-  return <PageHeader title="Issues" description="Report, track and resolve operational issues." />;
+import { IssuesView } from "./issues-view";
+
+export default function IssuesPage() {
+  return (
+    <Suspense>
+      <IssuesView />
+    </Suspense>
+  );
 }
