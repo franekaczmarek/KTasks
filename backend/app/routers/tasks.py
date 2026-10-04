@@ -19,7 +19,7 @@ RootCause = Literal["Procedure", "Human Error", "IT/Equipment", "Training", "Ven
 
 _TASK_SELECT = """
     select t.*, a.name as assignee_name, i.title as issue_title, i.status as issue_status,
-           i.priority as issue_priority,
+           i.priority as issue_priority, i.creator_id as issue_creator_id,
            exists(select 1 from public.blockers b where b.issue_id = i.id and b.is_active) as issue_blocked
     from public.tasks t
     join public.issues i on i.id = t.issue_id

@@ -175,6 +175,7 @@ export interface Task {
   issue_title: string;
   issue_status: IssueStatus;
   issue_priority: Priority;
+  issue_creator_id: string;
   issue_blocked: boolean;
 }
 

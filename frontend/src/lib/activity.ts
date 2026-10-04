@@ -33,6 +33,14 @@ export function describeActivity(a: ActivityEntry, users: User[] = []): string {
       return `added task "${d.title}"`;
     case "task_moved":
       return `moved task "${d.title}" from ${val(d.from)} to ${val(d.to)}`;
+    case "task_renamed":
+      return `renamed task "${d.from}" to "${d.to}"`;
+    case "task_updated":
+      return `updated the details of task "${d.title}"`;
+    case "task_reassigned":
+      return `reassigned task "${d.title}" from ${d.from ? name(d.from) : "unassigned"} to ${d.to ? name(d.to) : "unassigned"}`;
+    case "task_deleted":
+      return `deleted task "${d.title}"`;
     case "templates_applied":
       return `applied task templates (${d.count} tasks)`;
     case "resolved":

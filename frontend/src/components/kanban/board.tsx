@@ -7,7 +7,7 @@ import { cn } from "cn";
 
 import { TASK_COLUMNS, type Task, type TaskStatus } from "@/lib/types";
 
-import { TaskCard } from "./task-card";
+import { TaskCard, type TaskActions } from "./task-card";
 
 export interface Lane {
   id: string;            // assignee id, or "unassigned"
@@ -15,9 +15,10 @@ export interface Lane {
 }
 
 /** Drop target id format: `${laneId}|${status}`. */
-function Column({ laneId, status, label, tasks, showIssue, onMove, canMove, header }: {
+function Column({ laneId, status, label, tasks, showIssue, onMove, canMove, header, actionsFor }: {
   laneId: string; status: TaskStatus; label: string; tasks: Task[]; showIssue?: boolean;
   onMove: (task: Task, status: TaskStatus) => void; canMove: (task: Task) => boolean; header: boolean;
+  actionsFor?: (task: Task) => TaskActions;
 }) {
   const { setNodeRef, isOver } = useDroppable({ id: `${laneId}|${status}` });
   return (
@@ -34,19 +35,22 @@ function Column({ laneId, status, label, tasks, showIssue, onMove, canMove, head
         </div>
       )}
       {tasks.map((t) => (
-        <TaskCard key={t.id} task={t} showIssue={showIssue} onMove={onMove} disabled={!canMove(t)} />
+        <TaskCard key={t.id} task={t} showIssue={showIssue} onMove={onMove} disabled={!canMove(t)}
+          actions={actionsFor?.(t)} />
       ))}
     </div>
   );
 }
 
-export function KanbanBoard({ tasks, lanes, onMove, canMove, showIssue }: {
+export function KanbanBoard({ tasks, lanes, onMove, canMove, showIssue, actionsFor }: {
   tasks: Task[];
   /** When provided, renders one horizontal swimlane per entry (grouped by assignee). */
   lanes?: Lane[];
   onMove: (task: Task, status: TaskStatus, assigneeId?: string | null) => void;
   canMove: (task: Task) => boolean;
   showIssue?: boolean;
+  /** Edit/delete callbacks per task (omit a callback to hide that action). */
+  actionsFor?: (task: Task) => TaskActions;
 }) {
   const sensors = useSensors(
     useSensor(PointerSensor, { activationConstraint: { distance: 5 } }),
@@ -67,7 +71,7 @@ export function KanbanBoard({ tasks, lanes, onMove, canMove, showIssue }: {
       {TASK_COLUMNS.map((c) => (
         <Column key={c.status} laneId={laneId} status={c.status} label={c.label} header={header}
           tasks={laneTasks.filter((t) => t.status === c.status)} showIssue={showIssue}
-          onMove={(t, s) => onMove(t, s)} canMove={canMove} />
+          onMove={(t, s) => onMove(t, s)} canMove={canMove} actionsFor={actionsFor} />
       ))}
     </div>
   );

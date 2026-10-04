@@ -11,6 +11,8 @@ import { BlockedPill, PriorityPill, StatusPill } from "@/components/issues/pills
 import { KanbanBoard, type Lane } from "@/components/kanban/board";
 import { CompletionDialog } from "@/components/kanban/completion-dialog";
 import { NewTaskDialog } from "@/components/kanban/new-task-dialog";
+import { DeleteTaskDialog, EditTaskDialog } from "@/components/kanban/task-dialogs";
+import type { TaskActions } from "@/components/kanban/task-card";
 import { PageHeader } from "@/components/page-header";
 import { SimpleSelect } from "@/components/simple-select";
 import { Button } from "@/components/ui/button";
@@ -30,6 +32,8 @@ export function WorkView() {
   const { data: me } = useMe();
   const [completionFor, setCompletionFor] = useState<number | null>(null);
   const move = useMoveTask(setCompletionFor);
+  const [editing, setEditing] = useState<Task | null>(null);
+  const [deleting, setDeleting] = useState<Task | null>(null);
 
   const setParams = (next: Record<string, string | null>) => {
     const p = new URLSearchParams(params.toString());
@@ -37,9 +41,15 @@ export function WorkView() {
     router.replace(`${pathname}?${p.toString()}`, { scroll: false });
   };
 
-  const canMove = (t: Task, issue?: Pick<Issue, "creator_id">) =>
-    !!me && (me.role === "lead" || t.assignee_id === me.id || issue?.creator_id === me.id) &&
-    !["Resolved", "Closed", "Rejected"].includes(t.issue_status);
+  const isOpen = (t: Task) => !["Resolved", "Closed", "Rejected"].includes(t.issue_status);
+  // Lead, issue reporter or the task's assignee may move and edit; only Lead or reporter may delete.
+  const canMove = (t: Task) =>
+    !!me && isOpen(t) && (me.role === "lead" || t.assignee_id === me.id || t.issue_creator_id === me.id);
+  const canDelete = (t: Task) => !!me && isOpen(t) && (me.role === "lead" || t.issue_creator_id === me.id);
+  const actionsFor = (t: Task): TaskActions => ({
+    onEdit: canMove(t) ? setEditing : undefined,
+    onDelete: canDelete(t) ? setDeleting : undefined,
+  });
 
   return (
     <>
@@ -62,20 +72,27 @@ export function WorkView() {
       {view === "focused" ? (
         <FocusedBoard issueId={issueParam ? Number(issueParam) : null}
           onSelectIssue={(id) => setParams({ issue: String(id) })}
-          onMove={(task, status) => move.mutate({ task, status })} canMove={canMove} />
+          onMove={(task, status) => move.mutate({ task, status })} canMove={canMove} actionsFor={actionsFor} />
       ) : (
-        <GlobalBoard onMove={(task, status, assigneeId) => move.mutate({ task, status, assigneeId })} canMove={canMove} />
+        <GlobalBoard onMove={(task, status, assigneeId) => move.mutate({ task, status, assigneeId })} canMove={canMove}
+          actionsFor={actionsFor} />
       )}
       <CompletionDialog issueId={completionFor} onClose={() => setCompletionFor(null)} />
+      {editing && <EditTaskDialog key={editing.id} task={editing} onClose={() => setEditing(null)} />}
+      {deleting && (
+        <DeleteTaskDialog key={deleting.id} task={deleting} onClose={() => setDeleting(null)}
+          onCompletionPrompt={setCompletionFor} />
+      )}
     </>
   );
 }
 
-function FocusedBoard({ issueId, onSelectIssue, onMove, canMove }: {
+function FocusedBoard({ issueId, onSelectIssue, onMove, canMove, actionsFor }: {
   issueId: number | null;
   onSelectIssue: (id: number) => void;
   onMove: (task: Task, status: Task["status"]) => void;
-  canMove: (t: Task, issue?: Pick<Issue, "creator_id">) => boolean;
+  canMove: (t: Task) => boolean;
+  actionsFor: (t: Task) => TaskActions;
 }) {
   const { data: me } = useMe();
   const queryClient = useQueryClient();
@@ -145,16 +162,17 @@ function FocusedBoard({ issueId, onSelectIssue, onMove, canMove }: {
       ) : isLoading || !tasks ? (
         <Skeleton className="h-72 w-full rounded-2xl" />
       ) : (
-        <KanbanBoard tasks={tasks} onMove={onMove} canMove={(t) => canMove(t, issue)} />
+        <KanbanBoard tasks={tasks} onMove={onMove} canMove={canMove} actionsFor={actionsFor} />
       )}
       {issueId !== null && <NewTaskDialog issueId={issueId} open={newTaskOpen} onOpenChange={setNewTaskOpen} />}
     </div>
   );
 }
 
-function GlobalBoard({ onMove, canMove }: {
+function GlobalBoard({ onMove, canMove, actionsFor }: {
   onMove: (task: Task, status: Task["status"], assigneeId?: string | null) => void;
   canMove: (t: Task) => boolean;
+  actionsFor: (t: Task) => TaskActions;
 }) {
   const { data: users = [] } = useUsers();
   const { data: tasks, isLoading } = useQuery({
@@ -169,5 +187,5 @@ function GlobalBoard({ onMove, canMove }: {
       .map((u) => ({ id: u.id, label: u.name })),
     { id: "unassigned", label: "Unassigned" },
   ];
-  return <KanbanBoard tasks={tasks} lanes={lanes} onMove={onMove} canMove={canMove} showIssue />;
+  return <KanbanBoard tasks={tasks} lanes={lanes} onMove={onMove} canMove={canMove} actionsFor={actionsFor} showIssue />;
 }

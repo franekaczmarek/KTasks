@@ -2,7 +2,7 @@
 
 import { useDraggable } from "@dnd-kit/core";
 import { cn } from "cn";
-import { ArrowRightLeft, Ban, GripVertical } from "lucide-react";
+import { ArrowRightLeft, Ban, GripVertical, MoreHorizontal, Pencil, Trash2 } from "lucide-react";
 
 import { Pill } from "@/components/issues/pills";
 import { initials } from "@/components/layout/user-menu";
@@ -12,11 +12,18 @@ import {
 import { issueKey } from "@/lib/format";
 import { TASK_COLUMNS, type Task, type TaskStatus } from "@/lib/types";
 
-export function TaskCard({ task, showIssue, onMove, disabled }: {
+export interface TaskActions {
+  onEdit?: (task: Task) => void;
+  /** Present only when the user may delete this task (issue creator or Lead). */
+  onDelete?: (task: Task) => void;
+}
+
+export function TaskCard({ task, showIssue, onMove, disabled, actions }: {
   task: Task;
   showIssue?: boolean;
   onMove: (task: Task, status: TaskStatus) => void;
   disabled?: boolean;
+  actions?: TaskActions;
 }) {
   const { attributes, listeners, setNodeRef, transform, isDragging } = useDraggable({
     id: task.id,
@@ -65,6 +72,24 @@ export function TaskCard({ task, showIssue, onMove, disabled }: {
               {TASK_COLUMNS.filter((c) => c.status !== task.status).map((c) => (
                 <DropdownMenuItem key={c.status} onClick={() => onMove(task, c.status)}>Move to {c.label}</DropdownMenuItem>
               ))}
+            </DropdownMenuContent>
+          </DropdownMenu>
+        )}
+        {!disabled && (actions?.onEdit || actions?.onDelete) && (
+          <DropdownMenu>
+            <DropdownMenuTrigger aria-label={`Task actions ${task.title}`}
+              className="rounded p-1 text-muted-foreground opacity-60 hover:bg-muted hover:opacity-100">
+              <MoreHorizontal className="size-3.5" />
+            </DropdownMenuTrigger>
+            <DropdownMenuContent align="end">
+              {actions.onEdit && (
+                <DropdownMenuItem onClick={() => actions.onEdit!(task)}><Pencil /> Edit task</DropdownMenuItem>
+              )}
+              {actions.onDelete && (
+                <DropdownMenuItem variant="destructive" onClick={() => actions.onDelete!(task)}>
+                  <Trash2 /> Delete task
+                </DropdownMenuItem>
+              )}
             </DropdownMenuContent>
           </DropdownMenu>
         )}
