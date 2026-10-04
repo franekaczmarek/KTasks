@@ -48,6 +48,7 @@ KTasks is an internal tool for reporting operational issues, routing them to the
     - reset passwords
     - deactivate and reactivate accounts (deactivated users can't sign in)
   - An area Lead must be replaced in Lead settings before they can be demoted or deactivated.
+  - Every user can change their own password under **User menu → Change password**. The current password is required.
 - **Dashboard tab**
   - KPIs: average Lead response time, open issues, SLA compliance, time lost to blockers.
   - Charts: a Quick Wins matrix (priority × effort), the root-cause distribution, and the top blocker reasons.

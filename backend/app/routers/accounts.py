@@ -6,8 +6,10 @@ from fastapi import APIRouter, HTTPException
 from pydantic import BaseModel, EmailStr, Field
 
 from app.db import execute, fetch_all, fetch_one
-from app.deps import DB, LeadUser
-from app.services.accounts import check_signup_domain, create_account, generate_password, set_active, update_auth_user
+from app.deps import DB, CurrentUser, LeadUser
+from app.services.accounts import (
+    check_signup_domain, create_account, generate_password, set_active, update_auth_user, verify_password,
+)
 
 router = APIRouter(tags=["accounts"])
 
@@ -108,3 +110,18 @@ def admin_reset_password(user_id: UUID, body: PasswordIn, db: DB, _: LeadUser):
     password = body.password or generate_password()
     update_auth_user(str(user_id), password=password)
     return {"temporary_password": None if body.password else password}
+
+
+class ChangePasswordIn(BaseModel):
+    current_password: str = Field(min_length=1, max_length=72)
+    new_password: str = Field(min_length=8, max_length=72)
+
+
+@router.post("/me/password", status_code=204)
+def change_own_password(body: ChangePasswordIn, user: CurrentUser):
+    """Signed-in user changes their own password; the current one must be confirmed first."""
+    if body.new_password == body.current_password:
+        raise HTTPException(422, "The new password must be different from the current one")
+    if not verify_password(user["email"], body.current_password):
+        raise HTTPException(403, "Current password is incorrect")
+    update_auth_user(str(user["id"]), password=body.new_password)

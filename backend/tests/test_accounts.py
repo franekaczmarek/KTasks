@@ -136,3 +136,23 @@ def test_reset_password(client):
     assert sign_in(email, new_pw).status_code == 200
     assert client.post(f"/admin/users/{created['user']['id']}/reset-password", json={},
                        headers=auth(EMPLOYEE)).status_code == 403
+
+
+def test_user_changes_own_password(client):
+    email = new_email()
+    client.post("/auth/register", json={"email": email, "name": "Pw Changer", "password": "Original#2026"})
+    headers = token_headers(email, "Original#2026")
+
+    def change(current, new, h=headers):
+        return client.post("/me/password", json={"current_password": current, "new_password": new}, headers=h)
+
+    assert change("Wrong#2026", "Brandnew#2026").status_code == 403          # current must be right
+    assert change("Original#2026", "short").status_code == 422               # min 8 chars
+    assert change("Original#2026", "Original#2026").status_code == 422       # must differ
+    assert client.post("/me/password", json={"current_password": "x", "new_password": "Brandnew#2026"}).status_code == 401
+
+    assert change("Original#2026", "Brandnew#2026").status_code == 204
+    assert sign_in(email, "Original#2026").status_code == 400                # old one no longer works
+    assert sign_in(email, "Brandnew#2026").status_code == 200
+    # The session used for the change keeps working.
+    assert client.get("/me", headers=headers).status_code == 200

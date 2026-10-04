@@ -86,3 +86,16 @@ def update_auth_user(user_id: str, **fields: Any) -> None:
 def set_active(conn: Connection, user_id: str, active: bool) -> None:
     update_auth_user(str(user_id), ban_duration="none" if active else BAN_FOREVER)
     execute(conn, "update public.users set is_active = :a where id = :id", a=active, id=user_id)
+
+
+def verify_password(email: str, password: str) -> bool:
+    """Checks a user's current password against Supabase Auth (password grant)."""
+    s = get_settings()
+    r = httpx.post(f"{s.supabase_url}/auth/v1/token", params={"grant_type": "password"},
+                   headers={"apikey": s.supabase_publishable_key},
+                   json={"email": email, "password": password}, timeout=20)
+    if r.status_code == 200:
+        return True
+    if r.status_code in (400, 401):
+        return False
+    raise HTTPException(502, "Could not verify the current password, please try again")

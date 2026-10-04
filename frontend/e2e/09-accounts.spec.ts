@@ -114,3 +114,50 @@ test("employees cannot open the admin panel", async ({ page }) => {
   await expect(page.getByText("Only Leads can manage user accounts.")).toBeVisible();
   await expect(page.getByRole("button", { name: "Add user" })).toHaveCount(0);
 });
+
+test("signed-in user changes their own password", async ({ page }) => {
+  const errors = trackConsoleErrors(page);
+  const email = uniqueEmail("pw");
+  await page.goto("/register");
+  await page.getByLabel("Full name").fill("Password Changer");
+  await page.getByLabel("Work email").fill(email);
+  await page.getByLabel("Password", { exact: true }).fill("Original#2026");
+  await page.getByLabel("Confirm password").fill("Original#2026");
+  await page.getByRole("button", { name: "Create account" }).click();
+  await expect(page).toHaveURL(/\/issues/);
+
+  await page.getByRole("button", { name: "User menu" }).click();
+  await page.getByRole("menuitem", { name: "Change password" }).click();
+  const dialog = page.getByTestId("change-password-dialog");
+  const submit = dialog.getByRole("button", { name: "Change password" });
+
+  // Client-side checks.
+  await dialog.getByLabel("Current password").fill("Original#2026");
+  await dialog.getByLabel("New password", { exact: true }).fill("Newpass#2026");
+  await dialog.getByLabel("Confirm new password").fill("Newpass#2027");
+  await expect(dialog.getByRole("alert")).toHaveText("Passwords do not match.");
+  await expect(submit).toBeDisabled();
+
+  // Wrong current password is rejected by the server.
+  await dialog.getByLabel("Current password").fill("Wrong#2026");
+  await dialog.getByLabel("Confirm new password").fill("Newpass#2026");
+  await submit.click();
+  await expect(dialog.getByRole("alert")).toHaveText("Current password is incorrect");
+
+  // Correct current password: changed.
+  await dialog.getByLabel("Current password").fill("Original#2026");
+  await submit.click();
+  await expect(page.getByText("Password changed")).toBeVisible();
+  await expect(dialog).toHaveCount(0);
+
+  // Old password no longer works, the new one does.
+  await page.getByRole("button", { name: "User menu" }).click();
+  await page.getByRole("menuitem", { name: "Sign out" }).click();
+  await expect(page).toHaveURL(/\/login/);
+  await signIn(page, email, "Original#2026");
+  await expect(page.getByRole("alert").filter({ hasText: /invalid login credentials/i })).toBeVisible();
+  await signIn(page, email, "Newpass#2026");
+  await expect(page).toHaveURL(/\/issues/);
+
+  expect(errors.filter((e) => !e.includes("403") && !e.includes("400"))).toEqual([]); // expected rejections
+});
