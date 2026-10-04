@@ -9,7 +9,7 @@ from app.services.routing import area_leads
 
 router = APIRouter(tags=["users"])
 
-_USER_COLS = "id, email, name, role, backup_lead_id, is_absent"
+_USER_COLS = "id, email, name, role, backup_lead_id, is_absent, is_active"
 
 
 @router.get("/me", response_model=UserOut)

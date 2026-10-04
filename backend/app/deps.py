@@ -46,11 +46,13 @@ def current_user(db: DB, authorization: Annotated[str | None, Header()] = None) 
     claims = verify_token(authorization.split(" ", 1)[1])
     user = fetch_one(
         db,
-        "select id, email, name, role, backup_lead_id, is_absent from public.users where id = :id",
+        "select id, email, name, role, backup_lead_id, is_absent, is_active from public.users where id = :id",
         id=claims["sub"],
     )
     if user is None:
         raise HTTPException(status.HTTP_403_FORBIDDEN, "No KTasks profile for this account")
+    if not user["is_active"]:
+        raise HTTPException(status.HTTP_403_FORBIDDEN, "This account has been deactivated")
     return user
 
 

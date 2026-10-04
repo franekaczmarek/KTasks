@@ -7,6 +7,7 @@ import psycopg
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 from app.config import get_settings  # noqa: E402
+from app.services.accounts import admin_client  # noqa: E402
 
 USERS = [
     # email, name, role, backup (by email)
@@ -21,15 +22,6 @@ AREA_LEADS = {
     "Process": "anna.lead@ktasks.dev",
     "Improvements": "marek.lead@ktasks.dev",
 }
-
-
-def admin_client() -> httpx.Client:
-    s = get_settings()
-    return httpx.Client(
-        base_url=f"{s.supabase_url}/auth/v1/admin",
-        headers={"apikey": s.supabase_secret_key, "Authorization": f"Bearer {s.supabase_secret_key}"},
-        timeout=20,
-    )
 
 
 def ensure_auth_user(client: httpx.Client, existing: dict[str, str], email: str, name: str) -> str:

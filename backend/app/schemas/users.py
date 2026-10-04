@@ -13,6 +13,7 @@ class UserOut(BaseModel):
     role: Literal["employee", "lead"]
     backup_lead_id: UUID | None
     is_absent: bool
+    is_active: bool = True
 
 
 class UserPatch(BaseModel):

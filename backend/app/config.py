@@ -22,6 +22,8 @@ class Settings(BaseSettings):
     app_timezone: str = "Europe/Warsaw"
     frontend_url: str = "http://localhost:3000"
     seed_password: str = ""
+    # Comma-separated email domains allowed to self-register (empty = any domain).
+    allowed_signup_domains: str = ""
 
     # SLA targets in business days, per priority.
     sla_targets: dict[str, int] = {"Critical": 2, "High": 5, "Medium": 10, "Low": 20}

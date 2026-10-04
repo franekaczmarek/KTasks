@@ -49,6 +49,7 @@ def users(client):
 
 
 TEST_TAG = "[pytest]"
+TEST_ACCOUNT_PREFIX = "pytest+"
 
 
 @pytest.fixture(autouse=True)
@@ -67,11 +68,13 @@ def sent_emails(monkeypatch):
 @pytest.fixture(scope="session", autouse=True)
 def cleanup_test_issues():
     """Delete every issue created by tests (cascades to child rows) plus stored files."""
-    from scripts.cleanup_test_data import cleanup
+    from scripts.cleanup_test_data import cleanup, cleanup_accounts
 
     cleanup(TEST_TAG)
+    cleanup_accounts(TEST_ACCOUNT_PREFIX)
     yield
     cleanup(TEST_TAG)
+    cleanup_accounts(TEST_ACCOUNT_PREFIX)
 
 
 @pytest.fixture
