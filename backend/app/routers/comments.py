@@ -43,7 +43,7 @@ def discussions(db: DB, user: CurrentUser, include_closed: bool = False):
         from public.issues i
         left join last on last.issue_id = i.id
         left join public.issue_participants p on p.issue_id = i.id and p.user_id = :me
-        where {"true" if include_closed else "i.status not in ('Closed', 'Rejected')"}
+        where i.deleted_at is null and {"true" if include_closed else "i.status not in ('Closed', 'Rejected')"}
         order by last_activity_at desc
         """,
         me=user["id"],

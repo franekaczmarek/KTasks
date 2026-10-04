@@ -5,18 +5,24 @@ from app.deps import DB, CurrentUser
 
 router = APIRouter(prefix="/notifications", tags=["notifications"])
 
+# Hide notifications about soft-deleted issues, except the deletion notice itself.
+_VISIBLE = """and (issue_id is null or type = 'issue_deleted' or exists (
+    select 1 from public.issues i where i.id = notifications.issue_id and i.deleted_at is null))"""
+
 
 @router.get("")
 def list_notifications(db: DB, user: CurrentUser, limit: int = Query(20, ge=1, le=100), unread_only: bool = False):
     items = fetch_all(
         db,
         f"""select id, type, message, link, issue_id, read_status, created_at from public.notifications
-            where user_id = :me {"and not read_status" if unread_only else ""}
+            where user_id = :me {"and not read_status" if unread_only else ""} {_VISIBLE}
             order by created_at desc, id desc limit :limit""",
         me=user["id"], limit=limit,
     )
-    unread = fetch_one(db, "select count(*) as n from public.notifications where user_id = :me and not read_status",
-                       me=user["id"])["n"]
+    unread = fetch_one(
+        db, f"select count(*) as n from public.notifications where user_id = :me and not read_status {_VISIBLE}",
+        me=user["id"],
+    )["n"]
     return {"items": items, "unread_count": unread}
 
 

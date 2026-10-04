@@ -4,7 +4,7 @@ from typing import Annotated, Any, Literal
 from uuid import UUID, uuid4
 
 import httpx
-from fastapi import APIRouter, BackgroundTasks, File, Form, HTTPException, Query, UploadFile
+from fastapi import APIRouter, BackgroundTasks, Body, File, Form, HTTPException, Query, UploadFile
 from pydantic import BaseModel, Field
 
 from app.db import execute, fetch_all, fetch_one
@@ -16,6 +16,7 @@ from app.services.issue_queries import load_issue, load_issues
 from app.services.notifications import notify
 from app.services.routing import resolve_lead
 from app.services.sla import now
+from app.services.workflow import delete_issue
 
 router = APIRouter(prefix="/issues", tags=["issues"])
 
@@ -26,7 +27,7 @@ MAX_FILES, MAX_FILE_BYTES = 5, 10 * 1024 * 1024
 
 def issue_or_404(db, issue_id: int, lock: bool = False) -> dict[str, Any]:
     """lock=True takes a row lock so concurrent workflow changes on one issue are serialized."""
-    sql = "select * from public.issues where id = :id" + (" for update" if lock else "")
+    sql = "select * from public.issues where id = :id and deleted_at is null" + (" for update" if lock else "")
     issue = fetch_one(db, sql, id=issue_id)
     if issue is None:
         raise HTTPException(404, "Issue not found")
@@ -113,7 +114,7 @@ def duplicates(db: DB, _: CurrentUser, q: str = Query(max_length=200)):
         """select i.id, i.title, i.status, i.area, i.priority, l.name as lead_name,
                   round(similarity(i.title, :q)::numeric, 2) as score
            from public.issues i left join public.users l on l.id = i.lead_id
-           where i.status not in ('Closed', 'Rejected')
+           where i.status not in ('Closed', 'Rejected') and i.deleted_at is null
              and (similarity(i.title, :q) > 0.25 or i.title ilike :p or word_similarity(:q, i.title) > 0.5)
            order by similarity(i.title, :q) desc limit 5""",
         q=q, p=f"%{q}%",
@@ -268,3 +269,16 @@ def update_issue(issue_id: int, body: IssuePatch, db: DB, user: LeadUser, backgr
         else:
             log_activity(db, issue_id, user["id"], "updated", field=field, **{"from": old, "to": new})
     return load_issue(db, issue_id)
+
+
+class DeleteIn(BaseModel):
+    reason: str | None = Field(None, max_length=1000)
+
+
+@router.delete("/{issue_id}")
+def delete_issue_endpoint(issue_id: int, db: DB, user: CurrentUser, background: BackgroundTasks,
+                          body: Annotated[DeleteIn | None, Body()] = None):
+    """Reporter or assigned Lead removes an issue (soft delete, audited)."""
+    issue = issue_or_404(db, issue_id, lock=True)
+    delete_issue(db, issue, user, body.reason if body else None, background)
+    return {"deleted": issue_id}

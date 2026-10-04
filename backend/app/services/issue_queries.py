@@ -46,7 +46,8 @@ def task_counts_by_issue(conn: Connection, ids: list[int]) -> dict[int, dict[str
 
 
 def load_issues(conn: Connection, where: str = "true", order: str = "i.created_at desc", **params: Any):
-    issues = fetch_all(conn, f"{ISSUE_SELECT} where {where} order by {order}", **params)
+    # Soft-deleted issues are invisible everywhere in the app.
+    issues = fetch_all(conn, f"{ISSUE_SELECT} where ({where}) and i.deleted_at is null order by {order}", **params)
     ids = [i["id"] for i in issues]
     blockers = blockers_by_issue(conn, ids) if ids else {}
     counts = task_counts_by_issue(conn, ids) if ids else {}

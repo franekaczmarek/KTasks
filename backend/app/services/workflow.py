@@ -81,7 +81,8 @@ def auto_close_due(conn: Connection, at: datetime | None = None) -> list[int]:
     # 5 business days always span at least 5 calendar days: cheap SQL pre-filter, exact check in Python.
     candidates = fetch_all(
         conn,
-        "select * from public.issues where status = 'Resolved' and resolved_at <= :cutoff for update skip locked",
+        "select * from public.issues where status = 'Resolved' and deleted_at is null and resolved_at <= :cutoff "
+        "for update skip locked",
         cutoff=at - timedelta(days=days),
     )
     closed = []
@@ -113,3 +114,23 @@ def reject_issue(conn: Connection, issue: dict[str, Any], user: dict[str, Any], 
     notify(conn, issue_audience(conn, issue["id"]), "issue_rejected",
            f"KT-{issue['id']} was rejected by {user['name']}: {reason}",
            issue_id=issue["id"], link=f"/issues?issue={issue['id']}", exclude=user["id"])
+
+
+def delete_issue(conn: Connection, issue: dict[str, Any], user: dict[str, Any], reason: str | None,
+                 background=None) -> None:
+    """Soft delete by the reporter or the assigned Lead. Hidden everywhere; row kept for audit."""
+    if str(user["id"]) not in (str(issue["creator_id"]), str(issue["lead_id"])):
+        raise HTTPException(403, "Only the reporter or the Lead assigned to this issue can delete it")
+    if issue["status"] == "Closed":
+        raise HTTPException(409, "Closed issues are part of the quality record and cannot be deleted")
+    reason = (reason or "").strip() or None
+    at = now()
+    execute(conn, "update public.issues set deleted_at = :t, deleted_by_user_id = :u, deletion_reason = :r "
+                  "where id = :id", t=at, u=user["id"], r=reason, id=issue["id"])
+    execute(conn, "update public.blockers set is_active = false, resolved_at = :t where issue_id = :id and is_active",
+            t=at, id=issue["id"])
+    log_activity(conn, issue["id"], user["id"], "deleted", reason=reason, status=issue["status"])
+    notify(conn, issue_audience(conn, issue["id"]), "issue_deleted",
+           f"KT-{issue['id']} \"{issue['title']}\" was deleted by {user['name']}" + (f": {reason}" if reason else ""),
+           issue_id=issue["id"], link=None, exclude=user["id"], email_leads=True, background=background,
+           subject=f"[KTasks] KT-{issue['id']} deleted")

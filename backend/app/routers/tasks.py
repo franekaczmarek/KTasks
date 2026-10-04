@@ -80,7 +80,7 @@ def load_task(db, task_id: int):
 
 @router.get("/tasks")
 def list_tasks(db: DB, _: CurrentUser, issue_id: int | None = None, include_closed: bool = False):
-    where = ["true"]
+    where = ["i.deleted_at is null"]
     if issue_id is not None:
         where.append("t.issue_id = :issue_id")
     elif not include_closed:
