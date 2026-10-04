@@ -119,7 +119,7 @@ def test_task_permissions(client, make_issue, users):
     assert client.delete(f"/tasks/{t['id']}", headers=auth(EMPLOYEE2)).status_code == 403
     assert client.post(f"/issues/{iid}/tasks", json={"title": "bad", "assignee_id": "00000000-0000-0000-0000-000000000000"},
                        headers=auth(LEAD)).status_code == 422
-    assert client.delete(f"/tasks/{t['id']}", headers=auth(LEAD)).status_code == 204
+    assert client.delete(f"/tasks/{t['id']}", headers=auth(LEAD)).status_code == 200
     assert client.get(f"/tasks?issue_id={iid}", headers=auth(LEAD)).json() == []
 
 
@@ -144,3 +144,65 @@ def test_concurrent_last_moves_still_prompt(client, make_issue):
     with ThreadPoolExecutor(max_workers=3) as pool:
         results = list(pool.map(lambda t: move(client, t["id"], "Done"), tasks))
     assert sum(r["completion_prompt"] for r in results) == 1
+
+
+def test_edit_rename_and_reassign_is_audited_and_notified(client, make_issue, users, db):
+    iid = make_issue(title="Edit tasks")["id"]
+    t = add_task(client, iid, "Calibrte sensor", assignee_id=users[EMPLOYEE]["id"])
+
+    r = client.patch(f"/tasks/{t['id']}", json={"title": "  Calibrate sensor  ", "summary": "Use kit B",
+                                                "assignee_id": users[EMPLOYEE2]["id"]}, headers=auth(LEAD))
+    assert r.status_code == 200, r.text
+    body = r.json()
+    assert body["title"] == "Calibrate sensor" and body["summary"] == "Use kit B"
+    assert body["assignee_name"] == "Piotr Lewandowski"
+
+    log = [a for a in client.get(f"/issues/{iid}/activity", headers=auth(LEAD)).json()
+           if a["action_type"].startswith("task_") and a["action_type"] != "task_created"]
+    kinds = {a["action_type"]: a["details"] for a in log}
+    assert kinds["task_renamed"] == {"task_id": t["id"], "from": "Calibrte sensor", "to": "Calibrate sensor"}
+    assert kinds["task_reassigned"]["from"] == users[EMPLOYEE]["id"]
+    assert kinds["task_reassigned"]["to"] == users[EMPLOYEE2]["id"]
+    assert "task_updated" in kinds
+
+    msgs = [r[0] for r in db.execute(
+        "select n.message from public.notifications n join public.users u on u.id = n.user_id "
+        "where u.email = %s and n.issue_id = %s and n.type = 'task_assigned'", (EMPLOYEE2, iid))]
+    assert msgs == ['You were assigned "Calibrate sensor" on KT-%d' % iid]
+
+    # Unassign; a no-op patch writes nothing.
+    r = client.patch(f"/tasks/{t['id']}", json={"assignee_id": None}, headers=auth(LEAD))
+    assert r.json()["assignee_id"] is None
+    before = len(client.get(f"/issues/{iid}/activity", headers=auth(LEAD)).json())
+    client.patch(f"/tasks/{t['id']}", json={"title": "Calibrate sensor"}, headers=auth(LEAD))
+    assert len(client.get(f"/issues/{iid}/activity", headers=auth(LEAD)).json()) == before
+
+
+def test_edit_permissions_and_validation(client, make_issue, users):
+    iid = make_issue(title="Edit perms")["id"]
+    t = add_task(client, iid, "Owned by Piotr", assignee_id=users[EMPLOYEE2]["id"])
+    # Assignee may edit their task; an unrelated employee may not.
+    assert client.patch(f"/tasks/{t['id']}", json={"title": "Piotr renamed"}, headers=auth(EMPLOYEE2)).status_code == 200
+    assert client.patch(f"/tasks/{t['id']}", json={"title": "Hijack"}, headers=auth("ola@ktasks.dev")).status_code == 403
+    assert client.patch(f"/tasks/{t['id']}", json={"title": "  x "}, headers=auth(LEAD)).status_code == 422
+    assert client.patch(f"/tasks/{t['id']}", json={"title": None}, headers=auth(LEAD)).status_code == 422
+    assert client.patch(f"/tasks/{t['id']}", json={"assignee_id": "00000000-0000-0000-0000-000000000000"},
+                        headers=auth(LEAD)).status_code == 422
+    # Assignee may NOT delete (only creator or Lead).
+    assert client.delete(f"/tasks/{t['id']}", headers=auth(EMPLOYEE2)).status_code == 403
+    assert client.patch("/tasks/999999999", json={"title": "abc"}, headers=auth(LEAD)).status_code == 404
+
+
+def test_delete_last_open_task_prompts_completion(client, make_issue):
+    iid = make_issue(title="Delete prompt")["id"]
+    done, extra = add_task(client, iid, "Done work"), add_task(client, iid, "Not needed")
+    move(client, done["id"], "Done")                       # starts the issue; 'Not needed' still open
+    r = client.delete(f"/tasks/{extra['id']}", headers=auth(LEAD))
+    assert r.status_code == 200 and r.json() == {"deleted": extra["id"], "completion_prompt": True}
+    log = client.get(f"/issues/{iid}/activity", headers=auth(LEAD)).json()
+    assert log[-1]["action_type"] == "task_deleted" and log[-1]["details"]["title"] == "Not needed"
+
+    # Deleting from a still-New issue never prompts.
+    iid2 = make_issue(title="Delete no prompt")["id"]
+    only = add_task(client, iid2, "Only task")
+    assert client.delete(f"/tasks/{only['id']}", headers=auth(LEAD)).json()["completion_prompt"] is False

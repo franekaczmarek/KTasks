@@ -10,7 +10,7 @@ from app.routers.issues import add_participant, can_manage, issue_or_404
 from app.services.activity import log_activity
 from app.services.issue_queries import load_issue
 from app.services.notifications import notify
-from app.services.workflow import on_task_moved, resolve_issue
+from app.services.workflow import on_task_moved, open_task_count, resolve_issue
 
 router = APIRouter(tags=["tasks"])
 
@@ -137,19 +137,44 @@ def apply_templates(issue_id: int, body: TemplatesIn, db: DB, user: LeadUser):
 
 @router.patch("/tasks/{task_id}")
 def update_task(task_id: int, body: TaskPatch, db: DB, user: CurrentUser):
+    """Rename / re-describe / reassign a task. Every real change is audited."""
     task = task_or_404(db, task_id)
     issue = issue_or_404(db, task["issue_id"], lock=True)
+    task = task_or_404(db, task_id)  # re-read under the issue lock
     if not can_work_on(user, issue, task):
-        raise HTTPException(403, "Not allowed to edit this task")
+        raise HTTPException(403, "Only the creator, a Lead or the assignee can edit this task")
     ensure_open(issue)
     changes = body.model_dump(exclude_unset=True)
+    for key in ("title", "summary"):
+        if key in changes:
+            if changes[key] is None:
+                raise HTTPException(422, f"{key} cannot be null")
+            changes[key] = changes[key].strip()
+    if "title" in changes and len(changes["title"]) < 2:
+        raise HTTPException(422, "Task title must have at least 2 characters")
+    changes = {k: v for k, v in changes.items() if str(v) != str(task[k])}  # keep real changes only
+    if not changes:
+        return load_task(db, task_id)
+
     if "assignee_id" in changes:
         ensure_assignee(db, changes["assignee_id"])
-        if changes["assignee_id"]:
-            add_participant(db, issue["id"], changes["assignee_id"])
-    if changes:
-        execute(db, f"update public.tasks set {', '.join(f'{k} = :{k}' for k in changes)} where id = :id",
-                id=task_id, **changes)
+    execute(db, f"update public.tasks set {', '.join(f'{k} = :{k}' for k in changes)} where id = :id",
+            id=task_id, **changes)
+
+    title = changes.get("title", task["title"])
+    if "title" in changes:
+        log_activity(db, issue["id"], user["id"], "task_renamed", task_id=task_id,
+                     **{"from": task["title"], "to": changes["title"]})
+    if "summary" in changes:
+        log_activity(db, issue["id"], user["id"], "task_updated", task_id=task_id, title=title, field="details")
+    if "assignee_id" in changes:
+        new = changes["assignee_id"]
+        log_activity(db, issue["id"], user["id"], "task_reassigned", task_id=task_id, title=title,
+                     **{"from": task["assignee_id"], "to": new})
+        if new:
+            add_participant(db, issue["id"], new)
+            notify(db, [new], "task_assigned", f"You were assigned \"{title}\" on KT-{issue['id']}",
+                   issue_id=issue["id"], link=f"/work?issue={issue['id']}", exclude=user["id"])
     return load_task(db, task_id)
 
 
@@ -176,7 +201,7 @@ def move_task(task_id: int, body: TaskMove, db: DB, user: CurrentUser):
     return {"task": load_task(db, task_id), **flags}
 
 
-@router.delete("/tasks/{task_id}", status_code=204)
+@router.delete("/tasks/{task_id}")
 def delete_task(task_id: int, db: DB, user: CurrentUser):
     task = task_or_404(db, task_id)
     issue = issue_or_404(db, task["issue_id"], lock=True)
@@ -185,6 +210,10 @@ def delete_task(task_id: int, db: DB, user: CurrentUser):
     ensure_open(issue)
     execute(db, "delete from public.tasks where id = :id", id=task_id)
     log_activity(db, issue["id"], user["id"], "task_deleted", task_id=task_id, title=task["title"])
+    # Deleting the last open task of an In Progress issue leaves only Done work: ask whether it's finished.
+    remaining = fetch_one(db, "select count(*) as n from public.tasks where issue_id = :i", i=issue["id"])["n"]
+    prompt = issue["status"] == "In Progress" and remaining > 0 and open_task_count(db, issue["id"]) == 0
+    return {"deleted": task_id, "completion_prompt": prompt}
 
 
 @router.post("/issues/{issue_id}/resolve")
