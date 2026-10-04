@@ -28,7 +28,7 @@ def compute_metrics(
     """
     s = get_settings()
     current = at or now()
-    end = issue.get("resolved_at") or issue.get("closed_at") or current
+    end = issue.get("resolved_at") or issue.get("closed_at") or issue.get("rejected_at") or current
     created, started = issue["created_at"], issue.get("start_date")
 
     intervals = [(b["created_at"], b["resolved_at"] or current) for b in blockers]
@@ -40,7 +40,9 @@ def compute_metrics(
     target = s.sla_targets[issue["priority"]]
     ratio = lead_s / (target * DAY_SECONDS)
     finished = issue["status"] in ("Resolved", "Closed")
-    if finished:
+    if issue["status"] == "Rejected":
+        sla_state = "n_a"  # rejected issues are excluded from SLA compliance
+    elif finished:
         sla_state = "met" if ratio <= 1 else "breached"
     elif ratio > 1:
         sla_state = "breached"

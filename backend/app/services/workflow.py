@@ -9,7 +9,7 @@ from app.config import get_settings
 from app.db import execute, fetch_all, fetch_one
 from app.services.business_days import add_business_days
 from app.services.activity import log_activity
-from app.services.notifications import notify
+from app.services.notifications import issue_audience, notify
 from app.services.sla import now
 
 OPEN_TASK_SQL = "select count(*) as n from public.tasks where issue_id = :i and status in ('ToDo', 'InProgress')"
@@ -96,3 +96,20 @@ def auto_close_due(conn: Connection, at: datetime | None = None) -> list[int]:
                issue_id=issue["id"], link=f"/issues?issue={issue['id']}")
         closed.append(issue["id"])
     return closed
+
+
+def reject_issue(conn: Connection, issue: dict[str, Any], user: dict[str, Any], reason: str) -> None:
+    """A Lead rejects an issue (not a valid problem, out of scope, duplicate...). Terminal state."""
+    if issue["status"] not in ("New", "In Progress"):
+        raise HTTPException(409, f"Only New or In Progress issues can be rejected (current: {issue['status']})")
+    reason = reason.strip()
+    at = now()
+    execute(conn, "update public.issues set status = 'Rejected', rejected_reason = :r, rejected_at = :t, "
+                  "rejected_by_user_id = :u where id = :id", r=reason, t=at, u=user["id"], id=issue["id"])
+    # Open blockers stop counting once the issue is rejected.
+    execute(conn, "update public.blockers set is_active = false, resolved_at = :t where issue_id = :id and is_active",
+            t=at, id=issue["id"])
+    log_activity(conn, issue["id"], user["id"], "rejected", reason=reason, **{"from": issue["status"]})
+    notify(conn, issue_audience(conn, issue["id"]), "issue_rejected",
+           f"KT-{issue['id']} was rejected by {user['name']}: {reason}",
+           issue_id=issue["id"], link=f"/issues?issue={issue['id']}", exclude=user["id"])

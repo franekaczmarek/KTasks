@@ -61,7 +61,7 @@ def task_or_404(db, task_id: int):
 
 
 def ensure_open(issue):
-    if issue["status"] in ("Resolved", "Closed"):
+    if issue["status"] in ("Resolved", "Closed", "Rejected"):
         raise HTTPException(409, f"Issue KT-{issue['id']} is {issue['status']}; tasks are locked")
 
 
@@ -84,7 +84,7 @@ def list_tasks(db: DB, _: CurrentUser, issue_id: int | None = None, include_clos
     if issue_id is not None:
         where.append("t.issue_id = :issue_id")
     elif not include_closed:
-        where.append("i.status <> 'Closed'")
+        where.append("i.status not in ('Closed', 'Rejected')")
     return fetch_all(db, f"{_TASK_SELECT} where {' and '.join(where)} order by t.position, t.id", issue_id=issue_id)
 
 

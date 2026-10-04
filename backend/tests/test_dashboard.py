@@ -56,7 +56,7 @@ def test_kpis(client, scenario):
     assert k["sla_compliance_pct"] == 50.0
     assert k["responded_count"] == 2                            # C never got a lead response
     assert k["avg_lead_response_days"] == pytest.approx(0.5, abs=0.01)   # A: 1 bd, B: ~0
-    assert d["status_counts"] == {"New": 1, "In Progress": 0, "Resolved": 1, "Closed": 1}
+    assert d["status_counts"] == {"New": 1, "In Progress": 0, "Resolved": 1, "Closed": 1, "Rejected": 0}
     assert "issues" not in d
 
 
@@ -113,3 +113,12 @@ def test_export_pdf(client, scenario):
 def test_export_requires_auth(client):
     assert client.get("/reports/export").status_code == 401
     assert client.get("/dashboard").status_code == 401
+
+
+def test_rejected_issues_are_excluded_from_open_and_sla(client, scenario):
+    client.post(f"/issues/{scenario['a']}/reject", json={"reason": "Out of scope for QA"}, headers=auth(LEAD))
+    d = client.get("/dashboard", headers=auth(EMPLOYEE)).json()
+    assert d["status_counts"]["Rejected"] == 1
+    assert d["kpis"]["open_issues"] == 1                     # only B remains open
+    assert d["kpis"]["sla_finished_count"] == 2              # rejected issues don't count toward SLA
+    assert sum(c["count"] for c in d["quick_wins"]) == 1     # A left the quick-wins matrix

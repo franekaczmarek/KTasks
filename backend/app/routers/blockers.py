@@ -21,7 +21,7 @@ def add_blocker(issue_id: int, body: BlockerIn, db: DB, user: CurrentUser, backg
     issue = issue_or_404(db, issue_id)
     if not can_manage(user, issue):
         raise HTTPException(403, "Only the creator or a Lead can manage blockers")
-    if issue["status"] in ("Resolved", "Closed"):
+    if issue["status"] in ("Resolved", "Closed", "Rejected"):
         raise HTTPException(409, f"Cannot block a {issue['status'].lower()} issue")
     blocker = fetch_one(
         db,

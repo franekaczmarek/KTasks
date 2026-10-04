@@ -13,7 +13,7 @@ from reportlab.lib.units import mm
 from reportlab.platypus import Paragraph, SimpleDocTemplate, Spacer, Table, TableStyle
 
 NAVY, BERRY = "00205B", "D0006F"
-SLA_LABEL = {"on_track": "On track", "at_risk": "At risk", "breached": "Breached", "met": "Met"}
+SLA_LABEL = {"on_track": "On track", "at_risk": "At risk", "breached": "Breached", "met": "Met", "n_a": "N/A"}
 
 
 def _fmt(v: Any) -> Any:
@@ -49,12 +49,12 @@ def issue_rows(d: dict[str, Any]) -> list[list[Any]]:
         i["creator_name"], _fmt(i["created_at"]), i["metrics"]["lead_time_days"], i["metrics"]["blocker_time_days"],
         SLA_LABEL[i["metrics"]["sla_state"]], i["root_cause"] or "",
         "Yes" if i["metrics"]["is_blocked"] else "", _fmt(i["closed_at"]), i["closed_by_name"] or (
-            "auto" if i["status"] == "Closed" else ""),
+            "auto" if i["status"] == "Closed" else ""), i["rejected_reason"] or "",
     ] for i in d["issues"]]
 
 
 ISSUE_HEADERS = ["ID", "Title", "Area", "Priority", "Effort", "Status", "Lead", "Reported by", "Created",
-                 "Lead time (bd)", "Blocked (bd)", "SLA", "Root cause", "Blocked now", "Closed at", "Closed by"]
+                 "Lead time (bd)", "Blocked (bd)", "SLA", "Root cause", "Blocked now", "Closed at", "Closed by", "Rejected reason"]
 
 
 def to_xlsx(d: dict[str, Any]) -> bytes:

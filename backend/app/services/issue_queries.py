@@ -9,12 +9,13 @@ from app.services.sla import compute_metrics
 
 ISSUE_SELECT = """
     select i.*, c.name as creator_name, l.name as lead_name,
-           cb.name as closed_by_name, rb.name as resolved_by_name
+           cb.name as closed_by_name, rb.name as resolved_by_name, jb.name as rejected_by_name
     from public.issues i
     join public.users c on c.id = i.creator_id
     left join public.users l on l.id = i.lead_id
     left join public.users cb on cb.id = i.closed_by_user_id
     left join public.users rb on rb.id = i.resolved_by_user_id
+    left join public.users jb on jb.id = i.rejected_by_user_id
 """
 
 

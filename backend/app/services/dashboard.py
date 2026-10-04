@@ -47,7 +47,7 @@ def _first_lead_response(conn: Connection, ids: list[int]) -> dict[int, Any]:
 def build_dashboard(conn: Connection, area: str | None = None, days: int | None = None) -> dict[str, Any]:
     issues = scoped_issues(conn, area, days)
     current = now()
-    open_issues = [i for i in issues if i["status"] != "Closed"]
+    open_issues = [i for i in issues if i["status"] not in ("Closed", "Rejected")]
     finished = [i for i in issues if i["status"] in ("Resolved", "Closed")]
 
     responses = _first_lead_response(conn, [i["id"] for i in issues])
@@ -81,7 +81,7 @@ def build_dashboard(conn: Connection, area: str | None = None, days: int | None 
         bl = i["blockers"]
         if not bl:
             continue
-        end = i.get("resolved_at") or i.get("closed_at") or current
+        end = i.get("resolved_at") or i.get("closed_at") or i.get("rejected_at") or current
         total_blocked += business_seconds_union(
             [(b["created_at"], b["resolved_at"] or current) for b in bl], i["created_at"], end)
         for b in bl:
@@ -108,7 +108,7 @@ def build_dashboard(conn: Connection, area: str | None = None, days: int | None 
             "sla_finished_count": len(finished),
             "sla_met_count": met,
         },
-        "status_counts": {s: sum(1 for i in issues if i["status"] == s) for s in ("New", "In Progress", "Resolved", "Closed")},
+        "status_counts": {s: sum(1 for i in issues if i["status"] == s) for s in ("New", "In Progress", "Resolved", "Closed", "Rejected")},
         "quick_wins": matrix,
         "root_causes": root_causes,
         "blockers": {

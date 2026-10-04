@@ -86,7 +86,7 @@ def list_issues(
 ):
     where, params = ["true"], {}
     if status == "open":
-        where.append("i.status <> 'Closed'")
+        where.append("i.status not in ('Closed', 'Rejected')")
     elif status:
         where.append("i.status = :status")
         params["status"] = status
@@ -113,7 +113,7 @@ def duplicates(db: DB, _: CurrentUser, q: str = Query(max_length=200)):
         """select i.id, i.title, i.status, i.area, i.priority, l.name as lead_name,
                   round(similarity(i.title, :q)::numeric, 2) as score
            from public.issues i left join public.users l on l.id = i.lead_id
-           where i.status <> 'Closed'
+           where i.status not in ('Closed', 'Rejected')
              and (similarity(i.title, :q) > 0.25 or i.title ilike :p or word_similarity(:q, i.title) > 0.5)
            order by similarity(i.title, :q) desc limit 5""",
         q=q, p=f"%{q}%",
@@ -235,8 +235,8 @@ class IssuePatch(BaseModel):
 @router.patch("/{issue_id}")
 def update_issue(issue_id: int, body: IssuePatch, db: DB, user: LeadUser, background: BackgroundTasks):
     issue = issue_or_404(db, issue_id, lock=True)
-    if issue["status"] == "Closed":
-        raise HTTPException(409, "Closed issues cannot be edited")
+    if issue["status"] in ("Closed", "Rejected"):
+        raise HTTPException(409, f"{issue['status']} issues cannot be edited")
     changes = {k: v for k, v in body.model_dump(exclude_unset=True).items() if v != issue[k]}
     if "status" in changes and issue["status"] not in ("New", "In Progress"):
         raise HTTPException(409, "Use the resolution workflow to change status from Resolved")
