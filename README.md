@@ -31,6 +31,19 @@ KTasks is an internal tool for reporting operational issues, routing them to the
 - **Two-stage closure**
   - Only the reporter can confirm a resolution. Confirming records `closed_by_user_id` and `closed_at`.
   - Unconfirmed resolutions close automatically after **5 business days**, via an hourly job.
+- **Rejection**
+  - A Lead can reject a New or In Progress issue from the drawer. A written reason is mandatory.
+  - The reporter and the thread participants are notified and see the reason.
+  - Rejected is final: the issue is locked and drops out of open lists, discussions, Kanban and SLA compliance. You can still find it with the *Rejected* status filter.
+- **Accounts**
+  - Anyone can self-register at `/register`. New accounts are always **Employees**.
+    - `ALLOWED_SIGNUP_DOMAINS` in `.env` can limit sign-up to company domains.
+  - Leads manage everyone under **User menu → User management**:
+    - add users with a chosen or generated one-time password
+    - promote or demote Leads
+    - reset passwords
+    - deactivate and reactivate accounts (deactivated users can't sign in)
+  - An area Lead must be replaced in Lead settings before they can be demoted or deactivated.
 - **Dashboard tab**
   - KPIs: average Lead response time, open issues, SLA compliance, time lost to blockers.
   - Charts: a Quick Wins matrix (priority × effort), the root-cause distribution, and the top blocker reasons.

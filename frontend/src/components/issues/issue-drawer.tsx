@@ -18,6 +18,7 @@ import { fmtBytes, fmtDate, fmtDateTime, fmtDays, issueKey } from "@/lib/format"
 import { PRIORITIES, type ActivityEntry, type IssueDetail, type User } from "@/lib/types";
 
 import { AreaPill, BlockedPill, PriorityPill, SlaBadge, StatusPill } from "./pills";
+import { RejectIssueDialog } from "./reject-dialog";
 
 export function useInvalidateIssue() {
   const queryClient = useQueryClient();
@@ -114,7 +115,7 @@ function Overview({ issue }: { issue: IssueDetail }) {
   const isLead = me?.role === "lead";
   const canManage = isLead || me?.id === issue.creator_id;
   const m = issue.metrics;
-  const editable = isLead && issue.status !== "Closed";
+  const editable = isLead && issue.status !== "Closed" && issue.status !== "Rejected";
 
   return (
     <>
@@ -148,6 +149,7 @@ function Overview({ issue }: { issue: IssueDetail }) {
             ["Root cause", issue.root_cause ?? "—"],
             ["Resolved", issue.resolved_at ? `${fmtDateTime(issue.resolved_at)} by ${issue.resolved_by_name ?? "—"}` : "—"],
             ["Closed", issue.closed_at ? `${fmtDateTime(issue.closed_at)}${issue.closed_by_name ? ` by ${issue.closed_by_name}` : " (auto)"}` : "—"],
+            ...(issue.rejected_at ? [["Rejected", `${fmtDateTime(issue.rejected_at)} by ${issue.rejected_by_name ?? "—"}`]] : []),
             ["Participants", issue.participants.map((p) => p.name).join(", ")],
           ].map(([k, v]) => (
             <div key={k} className="flex gap-2">
@@ -171,13 +173,15 @@ function LeadControls({ issue, users }: { issue: IssueDetail; users: User[] }) {
     onSuccess: () => { invalidate(issue.id); toast.success("Issue updated"); },
     onError: (e) => toast.error(e.message),
   });
-  const leads = users.filter((u) => u.role === "lead").map((u) => ({ value: u.id, label: u.name }));
+  const leads = users.filter((u) => u.role === "lead" && u.is_active).map((u) => ({ value: u.id, label: u.name }));
+  const rejectable = issue.status === "New" || issue.status === "In Progress";
   const statusOptions = issue.status === "New" || issue.status === "In Progress"
     ? [{ value: "New", label: "New" }, { value: "In Progress", label: "In Progress" }]
     : [{ value: issue.status, label: issue.status }];
 
   return (
-    <Section title="Lead controls">
+    <Section title="Lead controls"
+      action={rejectable && <RejectIssueDialog issueId={issue.id} onRejected={() => invalidate(issue.id)} />}>
       <div className="grid grid-cols-2 gap-3 rounded-xl border p-3 text-sm sm:grid-cols-4">
         <label className="space-y-1">
           <span className="text-xs text-muted-foreground">Status</span>
@@ -270,7 +274,7 @@ function Attachments({ issue, canManage }: { issue: IssueDetail; canManage: bool
   });
   return (
     <Section title={`Attachments (${issue.attachments.length})`} icon={<Paperclip className="size-4" />}
-      action={canManage && issue.status !== "Closed" && (
+      action={canManage && issue.status !== "Closed" && issue.status !== "Rejected" && (
         <label className="cursor-pointer text-xs font-medium text-az-berry hover:underline">
           Add files
           <input type="file" multiple className="sr-only" aria-label="Add attachments"
@@ -298,7 +302,7 @@ function Attachments({ issue, canManage }: { issue: IssueDetail; canManage: bool
 }
 
 function ActivityLog({ issueId }: { issueId: number }) {
-  const { data: users = [] } = useUsers();
+  const { data: users = [] } = useUsers({ includeInactive: true });
   const { data = [], isLoading } = useQuery({
     queryKey: ["activity", issueId],
     queryFn: () => api.get<ActivityEntry[]>(`/issues/${issueId}/activity`),

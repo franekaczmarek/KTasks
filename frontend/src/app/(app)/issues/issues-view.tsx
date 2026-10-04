@@ -26,6 +26,7 @@ const STATUS_FILTERS = [
   { value: "In Progress", label: "In Progress" },
   { value: "Resolved", label: "Resolved" },
   { value: "Closed", label: "Closed" },
+  { value: "Rejected", label: "Rejected" },
 ];
 
 export function IssuesView() {

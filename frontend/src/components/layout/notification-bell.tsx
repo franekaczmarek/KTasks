@@ -2,7 +2,7 @@
 
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { cn } from "cn";
-import { Ban, Bell, CheckCheck, CircleCheck, MessageSquare, UserPlus, Workflow } from "lucide-react";
+import { Ban, Bell, CheckCheck, CircleCheck, CircleX, MessageSquare, UserPlus, Workflow } from "lucide-react";
 import { useRouter } from "next/navigation";
 import { useState } from "react";
 
@@ -23,7 +23,7 @@ interface Notification {
 const ICONS: Record<string, typeof Bell> = {
   issue_assigned: UserPlus, task_assigned: UserPlus, comment: MessageSquare, blocker_added: Ban,
   blocker_resolved: CircleCheck, verification_request: CircleCheck, resolution_confirmed: CheckCheck,
-  auto_closed: CheckCheck, status_changed: Workflow,
+  auto_closed: CheckCheck, status_changed: Workflow, issue_rejected: CircleX,
 };
 
 export function NotificationBell() {

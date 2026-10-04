@@ -1,5 +1,6 @@
 "use client";
 
+import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
 import { Suspense, useState } from "react";
 
@@ -62,6 +63,10 @@ export default function LoginPage() {
         <Suspense>
           <LoginForm />
         </Suspense>
+        <p className="mt-6 text-center text-sm text-muted-foreground">
+          New to KTasks?{" "}
+          <Link href="/register" className="font-medium text-az-berry hover:underline">Create an account</Link>
+        </p>
       </div>
     </main>
   );

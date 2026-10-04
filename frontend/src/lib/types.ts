@@ -10,6 +10,7 @@ export interface User {
   role: Role;
   backup_lead_id: string | null;
   is_absent: boolean;
+  is_active: boolean;
 }
 
 export interface AreaLead {
@@ -29,14 +30,14 @@ export interface SearchResults {
 
 export type Priority = "Low" | "Medium" | "High" | "Critical";
 export type Effort = "Low" | "Medium" | "High";
-export type IssueStatus = "New" | "In Progress" | "Resolved" | "Closed";
+export type IssueStatus = "New" | "In Progress" | "Resolved" | "Closed" | "Rejected";
 export type RootCause = "Procedure" | "Human Error" | "IT/Equipment" | "Training" | "Vendor" | "Other";
 export type TaskStatus = "ToDo" | "InProgress" | "Done";
-export type SlaState = "on_track" | "at_risk" | "breached" | "met";
+export type SlaState = "on_track" | "at_risk" | "breached" | "met" | "n_a";
 
 export const PRIORITIES: Priority[] = ["Low", "Medium", "High", "Critical"];
 export const EFFORTS: Effort[] = ["Low", "Medium", "High"];
-export const STATUSES: IssueStatus[] = ["New", "In Progress", "Resolved", "Closed"];
+export const STATUSES: IssueStatus[] = ["New", "In Progress", "Resolved", "Closed", "Rejected"];
 export const ROOT_CAUSES: RootCause[] = ["Procedure", "Human Error", "IT/Equipment", "Training", "Vendor", "Other"];
 
 export interface Metrics {
@@ -87,6 +88,10 @@ export interface Issue {
   closed_by_user_id: string | null;
   closed_by_name: string | null;
   closed_at: string | null;
+  rejected_reason: string | null;
+  rejected_at: string | null;
+  rejected_by_user_id: string | null;
+  rejected_by_name: string | null;
   metrics: Metrics;
   blockers: Blocker[];
 }

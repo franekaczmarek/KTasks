@@ -39,7 +39,7 @@ export function WorkView() {
 
   const canMove = (t: Task, issue?: Pick<Issue, "creator_id">) =>
     !!me && (me.role === "lead" || t.assignee_id === me.id || issue?.creator_id === me.id) &&
-    t.issue_status !== "Resolved" && t.issue_status !== "Closed";
+    !["Resolved", "Closed", "Rejected"].includes(t.issue_status);
 
   return (
     <>
@@ -84,7 +84,7 @@ function FocusedBoard({ issueId, onSelectIssue, onMove, canMove }: {
     queryKey: ["issues", "work-selector"],
     queryFn: () => api.get<Issue[]>("/issues?scope=all"),
   });
-  const selectable = issues.filter((i) => i.status !== "Closed" || i.id === issueId);
+  const selectable = issues.filter((i) => !["Closed", "Rejected"].includes(i.status) || i.id === issueId);
   const issue = issues.find((i) => i.id === issueId);
   const { data: tasks, isLoading } = useQuery({
     queryKey: ["tasks", "issue", issueId],
@@ -102,7 +102,7 @@ function FocusedBoard({ issueId, onSelectIssue, onMove, canMove }: {
     onError: (e) => toast.error(e.message),
   });
 
-  const locked = issue?.status === "Resolved" || issue?.status === "Closed";
+  const locked = ["Resolved", "Closed", "Rejected"].includes(issue?.status ?? "");
   const canEdit = !!me && !!issue && (me.role === "lead" || me.id === issue.creator_id) && !locked;
 
   return (

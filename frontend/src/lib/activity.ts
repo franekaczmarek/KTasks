@@ -41,6 +41,8 @@ export function describeActivity(a: ActivityEntry, users: User[] = []): string {
       return "confirmed the resolution and closed the issue";
     case "auto_closed":
       return `auto-closed the issue after ${d.business_days} business days without confirmation`;
+    case "rejected":
+      return `rejected the issue: "${d.reason}"`;
     case "reopened":
       return `reopened the issue${d.reason ? `: "${d.reason}"` : ""}`;
     default:

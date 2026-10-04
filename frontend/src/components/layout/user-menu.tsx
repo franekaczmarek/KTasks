@@ -1,7 +1,7 @@
 "use client";
 
 import { useQueryClient } from "@tanstack/react-query";
-import { LogOut, Settings } from "lucide-react";
+import { LogOut, Settings, Users } from "lucide-react";
 import { useRouter } from "next/navigation";
 
 import {
@@ -50,6 +50,11 @@ export function UserMenu() {
         {me?.role === "lead" && (
           <DropdownMenuItem onClick={() => router.push("/settings")}>
             <Settings /> Lead settings
+          </DropdownMenuItem>
+        )}
+        {me?.role === "lead" && (
+          <DropdownMenuItem onClick={() => router.push("/admin/users")}>
+            <Users /> User management
           </DropdownMenuItem>
         )}
         <DropdownMenuItem onClick={signOut}>

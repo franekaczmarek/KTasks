@@ -1,7 +1,7 @@
 "use client";
 
 import { useMutation } from "@tanstack/react-query";
-import { BadgeCheck, Hourglass, Lock } from "lucide-react";
+import { BadgeCheck, CircleX, Hourglass, Lock } from "lucide-react";
 import { toast } from "sonner";
 
 import { Button } from "@/components/ui/button";
@@ -45,6 +45,21 @@ export function ResolutionPanel({ issue }: { issue: IssueDetail }) {
               <BadgeCheck /> Confirm Resolution
             </Button>
           )}
+        </div>
+      </div>
+    );
+  }
+
+  if (issue.status === "Rejected") {
+    return (
+      <div className="flex items-start gap-3 rounded-2xl border border-slate-300 bg-slate-50 p-4 text-sm"
+        data-testid="rejected-panel">
+        <CircleX className="mt-0.5 size-5 shrink-0 text-slate-600" />
+        <div>
+          <div className="font-semibold text-slate-900">
+            Rejected by {issue.rejected_by_name ?? "a Lead"} on {fmtDateTime(issue.rejected_at)}
+          </div>
+          <p className="mt-0.5 whitespace-pre-wrap text-slate-700" data-testid="rejected-reason">{issue.rejected_reason}</p>
         </div>
       </div>
     );
