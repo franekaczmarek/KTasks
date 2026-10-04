@@ -114,4 +114,5 @@ cd frontend && npm run lint && npm run build && npx playwright test   # starts b
   - The API verifies the ES256 access token against the project JWKS.
 - **Concurrency:** workflow endpoints lock the issue row (`SELECT … FOR UPDATE`). Simultaneous task moves therefore can't skip the completion prompt.
 - **Commit timing:** the DB dependency runs with `scope="function"`, so each transaction commits before the response is sent.
-- **Security:** `PROMPT.md` and `.env` contain secrets and are gitignored. Rotate the Supabase and Resend keys if they were ever shared.
+- **Security:** secrets live only in `.env` and `frontend/.env.local` (gitignored). Rotate the Supabase and Resend keys if they were ever shared.
+- **Project brief:** a local, gitignored `PROMPT.md` holds the living spec (principles, stack, schema, features). `CLAUDE.md` imports it so every Claude Code session starts from it.
