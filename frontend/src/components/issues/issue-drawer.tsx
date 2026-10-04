@@ -17,6 +17,7 @@ import { api } from "@/lib/api";
 import { fmtBytes, fmtDate, fmtDateTime, fmtDays, issueKey } from "@/lib/format";
 import { PRIORITIES, type ActivityEntry, type IssueDetail, type User } from "@/lib/types";
 
+import { DeleteIssueDialog } from "./delete-issue-dialog";
 import { AreaPill, BlockedPill, PriorityPill, SlaBadge, StatusPill } from "./pills";
 import { RejectIssueDialog } from "./reject-dialog";
 
@@ -71,7 +72,7 @@ export function IssueDrawer({ issueId, onClose, children }: {
                   <TabsTrigger value="activity"><History className="size-3.5" /> Activity</TabsTrigger>
                 </TabsList>
                 <TabsContent value="overview" className="space-y-6 pt-4">
-                  <Overview issue={issue} />
+                  <Overview issue={issue} onDeleted={onClose} />
                 </TabsContent>
                 <TabsContent value="activity" className="pt-4">
                   <ActivityLog issueId={issue.id} />
@@ -109,7 +110,7 @@ function Stat({ label, value, hint }: { label: string; value: string; hint?: str
   );
 }
 
-function Overview({ issue }: { issue: IssueDetail }) {
+function Overview({ issue, onDeleted }: { issue: IssueDetail; onDeleted: () => void }) {
   const { data: me } = useMe();
   const { data: users = [] } = useUsers();
   const isLead = me?.role === "lead";
@@ -162,6 +163,18 @@ function Overview({ issue }: { issue: IssueDetail }) {
 
       <Blockers issue={issue} canManage={canManage} />
       <Attachments issue={issue} canManage={canManage} />
+
+      {/* Only the reporter or the Lead assigned to this issue may delete it; closed records are kept. */}
+      {(me?.id === issue.creator_id || me?.id === issue.lead_id) && issue.status !== "Closed" && (
+        <section className="flex items-center justify-between gap-3 rounded-xl border border-destructive/30 p-3"
+          data-testid="danger-zone">
+          <div className="text-sm">
+            <div className="font-medium text-destructive">Delete this issue</div>
+            <div className="text-xs text-muted-foreground">Removes it from KTasks for everyone. Recorded for audit.</div>
+          </div>
+          <DeleteIssueDialog issueId={issue.id} title={issue.title} onDeleted={onDeleted} />
+        </section>
+      )}
     </>
   );
 }

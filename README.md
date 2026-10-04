@@ -35,6 +35,10 @@ KTasks is an internal tool for reporting operational issues, routing them to the
   - A Lead can reject a New or In Progress issue from the drawer. A written reason is mandatory.
   - The reporter and the thread participants are notified and see the reason.
   - Rejected is final: the issue is locked and drops out of open lists, discussions, Kanban and SLA compliance. You can still find it with the *Rejected* status filter.
+- **Deleting issues**
+  - The reporter or the Lead assigned to the issue can delete it from the drawer, optionally giving a reason. No one else can.
+  - This is a soft delete: the issue disappears from the whole app, but the database keeps the row, who deleted it and when, for audit.
+  - Closed issues cannot be deleted.
 - **Accounts**
   - Anyone can self-register at `/register`. New accounts are always **Employees**.
     - `ALLOWED_SIGNUP_DOMAINS` in `.env` can limit sign-up to company domains.
