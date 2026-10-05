@@ -203,3 +203,79 @@ export function QuickWinsMatrix({ cells }: { cells: DashboardData["quick_wins"] 
     </div>
   );
 }
+
+/* ---------- SLA status: part-to-whole per group, status palette (always icon + label) ---------- */
+
+const STATUS = {
+  good: { color: "#0ca30c", Icon: CheckCircle2 },
+  warning: { color: "#fab219", Icon: AlertTriangle },
+  critical: { color: "#d03b3b", Icon: XCircle },
+} as const;
+
+type SlaSegment = { key: string; label: string; value: number; status: keyof typeof STATUS };
+
+function StackedStatusBar({ title, segments, testId }: { title: string; segments: SlaSegment[]; testId: string }) {
+  const total = segments.reduce((n, s) => n + s.value, 0);
+  const pct = (v: number) => (total ? Math.round((v / total) * 100) : 0);
+  return (
+    <div data-testid={testId}>
+      <div className="mb-2 flex items-baseline justify-between text-sm">
+        <span className="font-medium text-foreground">{title}</span>
+        <span className="text-xs tabular-nums text-muted-foreground">{total} issue{total === 1 ? "" : "s"}</span>
+      </div>
+      {total === 0 ? (
+        <div className="h-6 rounded-[4px]" style={{ background: EMPTY }} aria-label="No issues" />
+      ) : (
+        // 2px surface gap between segments; 4px rounded outer ends.
+        <div className="flex h-6 gap-[2px] overflow-hidden rounded-[4px]" role="img"
+          aria-label={segments.map((s) => `${s.label}: ${s.value}`).join(", ")}>
+          {segments.filter((s) => s.value > 0).map((s) => (
+            <div key={s.key} className="group relative h-full" style={{ flexGrow: s.value, background: STATUS[s.status].color }}>
+              <span role="tooltip"
+                className="pointer-events-none absolute bottom-full left-1/2 z-10 mb-1 hidden -translate-x-1/2 whitespace-nowrap rounded-md bg-foreground px-2 py-1 text-xs text-background shadow-md group-hover:block">
+                {s.label}: {s.value} ({pct(s.value)}%)
+              </span>
+            </div>
+          ))}
+        </div>
+      )}
+      <ul className="mt-2 flex flex-wrap gap-x-5 gap-y-1 text-xs">
+        {segments.map((s) => {
+          const { color, Icon } = STATUS[s.status];
+          return (
+            <li key={s.key} className="flex items-center gap-1.5" data-testid={`${testId}-${s.key}`}>
+              <Icon className="size-3.5" style={{ color }} aria-hidden />
+              <span className="text-muted-foreground">{s.label}</span>
+              <span className="font-semibold tabular-nums text-foreground">{s.value}</span>
+              <span className="tabular-nums text-muted-foreground">({pct(s.value)}%)</span>
+            </li>
+          );
+        })}
+      </ul>
+    </div>
+  );
+}
+
+export function slaSegments(sla: DashboardData["sla_status"]) {
+  return {
+    active: [
+      { key: "on_track", label: "On track", value: sla.active.on_track, status: "good" },
+      { key: "at_risk", label: "At risk", value: sla.active.at_risk, status: "warning" },
+      { key: "breached", label: "Breached", value: sla.active.breached, status: "critical" },
+    ] satisfies SlaSegment[],
+    finished: [
+      { key: "met", label: "Met", value: sla.finished.met, status: "good" },
+      { key: "breached", label: "Breached", value: sla.finished.breached, status: "critical" },
+    ] satisfies SlaSegment[],
+  };
+}
+
+export function SlaStatusChart({ sla }: { sla: DashboardData["sla_status"] }) {
+  const seg = slaSegments(sla);
+  return (
+    <div className="grid gap-6 md:grid-cols-2">
+      <StackedStatusBar title="Active issues (New / In Progress)" segments={seg.active} testId="sla-active" />
+      <StackedStatusBar title="Resolved & closed" segments={seg.finished} testId="sla-finished" />
+    </div>
+  );
+}

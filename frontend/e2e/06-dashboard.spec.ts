@@ -19,6 +19,13 @@ test("dashboard KPIs, quick-wins matrix, table view, filters and exports", async
   expect(Number(await page.getByTestId("kpi-open-value").innerText())).toBeGreaterThanOrEqual(1);
   await expect(page.getByTestId("kpi-open")).toContainText("blocked");
 
+  // SLA status chart (first chart): the fresh Critical issue is active and on track; table twin.
+  const sla = page.getByTestId("chart-sla-status");
+  await expect(sla.getByTestId("sla-active")).toBeVisible();
+  expect(Number(await sla.getByTestId("sla-active-on_track").locator("span.font-semibold").innerText())).toBeGreaterThanOrEqual(1);
+  await sla.getByRole("tab", { name: "table" }).click();
+  await expect(sla.getByRole("table")).toContainText("On track");
+
   // Quick-win cell holds the new issue; tooltip lists it on hover.
   const cell = page.getByTestId("qw-Critical-Low");
   await expect(cell).toHaveAttribute("data-quick-win", "true");

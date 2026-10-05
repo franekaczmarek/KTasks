@@ -94,6 +94,20 @@ def build_dashboard(conn: Connection, area: str | None = None, days: int | None 
     for r in top_reasons:
         r["days"] = round(r["days"], 2)
 
+    # SLA phases: active work (New / In Progress) is on track, at risk or breached; finished work met or missed.
+    active = [i for i in issues if i["status"] in ("New", "In Progress")]
+    pending = fetch_all(
+        conn, "select count(*) as n from public.due_date_requests where status = 'pending' and issue_id = any(:ids)",
+        ids=[i["id"] for i in active],
+    )[0]["n"] if active else 0
+    sla_status = {
+        "active": {st: sum(1 for i in active if i["metrics"]["sla_state"] == st)
+                   for st in ("on_track", "at_risk", "breached")},
+        "finished": {st: sum(1 for i in finished if i["metrics"]["sla_state"] == st) for st in ("met", "breached")},
+        "agreed_count": sum(1 for i in active if i["metrics"]["sla_basis"] == "agreed"),
+        "pending_requests": pending,
+    }
+
     blocked_issue_days = [i["metrics"]["blocker_time_days"] for i in issues if i["blockers"]]
     return {
         "scope": {"area": area, "days": days, "issue_count": len(issues), "generated_at": current},
@@ -109,6 +123,7 @@ def build_dashboard(conn: Connection, area: str | None = None, days: int | None 
             "sla_met_count": met,
         },
         "status_counts": {s: sum(1 for i in issues if i["status"] == s) for s in ("New", "In Progress", "Resolved", "Closed", "Rejected")},
+        "sla_status": sla_status,
         "quick_wins": matrix,
         "root_causes": root_causes,
         "blockers": {

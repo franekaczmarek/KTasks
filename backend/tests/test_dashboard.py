@@ -58,6 +58,9 @@ def test_kpis(client, scenario):
     assert k["avg_lead_response_days"] == pytest.approx(0.5, abs=0.01)   # A: 1 bd, B: ~0
     assert d["status_counts"] == {"New": 1, "In Progress": 0, "Resolved": 1, "Closed": 1, "Rejected": 0}
     assert "issues" not in d
+    # A is active and past its Critical target; B met its SLA; C missed it.
+    assert d["sla_status"] == {"active": {"on_track": 0, "at_risk": 0, "breached": 1},
+                               "finished": {"met": 1, "breached": 1}, "agreed_count": 0, "pending_requests": 0}
 
 
 def test_quick_wins_root_causes_and_blockers(client, scenario):
@@ -96,7 +99,9 @@ def test_export_xlsx(client, scenario):
     assert r.status_code == 200
     assert r.headers["content-disposition"].startswith('attachment; filename="ktasks-report-')
     wb = load_workbook(BytesIO(r.content))
-    assert wb.sheetnames == ["Summary", "Issues", "Root causes", "Quick wins", "Blockers"]
+    assert wb.sheetnames == ["Summary", "SLA status", "Issues", "Root causes", "Quick wins", "Blockers"]
+    sla = list(wb["SLA status"].iter_rows(values_only=True))
+    assert sla[0] == ("Group", "SLA phase", "Issues") and ("Resolved / Closed", "Met", 1) in sla
     issues = list(wb["Issues"].iter_rows(values_only=True))
     assert issues[0][0] == "ID" and len(issues) == 4
     assert {row[0] for row in issues[1:]} == {f"KT-{i}" for i in scenario.values()}

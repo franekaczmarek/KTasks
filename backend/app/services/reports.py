@@ -43,18 +43,25 @@ def kpi_rows(d: dict[str, Any]) -> list[tuple[str, Any]]:
     ]
 
 
+def sla_status_rows(d: dict[str, Any]) -> list[tuple[str, str, int]]:
+    active, finished = d["sla_status"]["active"], d["sla_status"]["finished"]
+    return ([("Active (New / In Progress)", SLA_LABEL[k], v) for k, v in active.items()]
+            + [("Resolved / Closed", SLA_LABEL[k], v) for k, v in finished.items()])
+
+
 def issue_rows(d: dict[str, Any]) -> list[list[Any]]:
     return [[
         f"KT-{i['id']}", i["title"], i["area"], i["priority"], i["effort"], i["status"], i["lead_name"] or "",
         i["creator_name"], _fmt(i["created_at"]), i["metrics"]["lead_time_days"], i["metrics"]["blocker_time_days"],
         SLA_LABEL[i["metrics"]["sla_state"]], i["root_cause"] or "",
         "Yes" if i["metrics"]["is_blocked"] else "", _fmt(i["closed_at"]), i["closed_by_name"] or (
-            "auto" if i["status"] == "Closed" else ""), i["rejected_reason"] or "",
+            "auto" if i["status"] == "Closed" else ""), i["rejected_reason"] or "", _fmt(i["expected_end_date"]) or "",
     ] for i in d["issues"]]
 
 
 ISSUE_HEADERS = ["ID", "Title", "Area", "Priority", "Effort", "Status", "Lead", "Reported by", "Created",
-                 "Lead time (bd)", "Blocked (bd)", "SLA", "Root cause", "Blocked now", "Closed at", "Closed by", "Rejected reason"]
+                 "Lead time (bd)", "Blocked (bd)", "SLA", "Root cause", "Blocked now", "Closed at", "Closed by", "Rejected reason",
+                 "Agreed due date"]
 
 
 def to_xlsx(d: dict[str, Any]) -> bytes:
@@ -88,6 +95,7 @@ def to_xlsx(d: dict[str, Any]) -> bytes:
         ws.append(list(row))
     ws.column_dimensions["A"].width, ws.column_dimensions["B"].width = 46, 14
 
+    sheet(wb.create_sheet("SLA status"), ["Group", "SLA phase", "Issues"], sla_status_rows(d))
     sheet(wb.create_sheet("Issues"), ISSUE_HEADERS, issue_rows(d))
     sheet(wb.create_sheet("Root causes"), ["Root cause", "Issues"],
           [(r["root_cause"], r["count"]) for r in d["root_causes"]])
@@ -127,6 +135,10 @@ def to_pdf(d: dict[str, Any]) -> bytes:
         Spacer(1, 6),
         Paragraph("Key indicators", h2),
         table([["KPI", "Value"]] + [[k, str(_fmt(v))] for k, v in kpi_rows(d)], [110 * mm, 30 * mm]),
+        Paragraph(f"SLA status ({d['sla_status']['agreed_count']} active issues on an agreed due date, "
+                  f"{d['sla_status']['pending_requests']} due date changes awaiting the reporter)", h2),
+        table([["Group", "SLA phase", "Issues"]] + [list(r) for r in sla_status_rows(d)],
+              [60 * mm, 30 * mm, 25 * mm]),
         Paragraph("Root cause analysis (resolved / closed)", h2),
         table([["Root cause", "Issues"]] + [[r["root_cause"], r["count"]] for r in d["root_causes"]],
               [60 * mm, 25 * mm]),

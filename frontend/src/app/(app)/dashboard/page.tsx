@@ -7,7 +7,7 @@ import { useState } from "react";
 import { toast } from "sonner";
 
 import {
-  ChartCard, ComplianceMeter, DataTable, HBarChart, QuickWinsMatrix, StatTile,
+  ChartCard, ComplianceMeter, DataTable, HBarChart, QuickWinsMatrix, SlaStatusChart, StatTile, slaSegments,
 } from "@/components/dashboard/charts";
 import { PageHeader } from "@/components/page-header";
 import { SimpleSelect } from "@/components/simple-select";
@@ -24,6 +24,12 @@ const PERIODS = [
   { value: "365", label: "Last 12 months" },
   { value: "all", label: "All time" },
 ];
+
+function slaSubtitle({ agreed_count, pending_requests }: DashboardData["sla_status"]) {
+  const pending = pending_requests
+    ? ` · ${pending_requests} due date change${pending_requests === 1 ? "" : "s"} awaiting the reporter` : "";
+  return `Issues in each SLA phase · ${agreed_count} active on an agreed due date${pending}`;
+}
 
 const bd = (v: number | null | undefined) => (v == null ? "—" : `${v.toFixed(1)} bd`);
 
@@ -95,6 +101,15 @@ export default function DashboardPage() {
             <StatTile testId="kpi-blockers" label="Time lost to blockers" value={bd(data.blockers.total_days)}
               hint={`${data.blockers.active} active · avg ${bd(data.blockers.avg_days_per_blocked_issue)} per blocked issue`} />
           </div>
+
+          <ChartCard testId="chart-sla-status" title="SLA status"
+            subtitle={slaSubtitle(data.sla_status)}
+            table={<DataTable headers={["Group", "SLA phase", "Issues"]} rows={[
+              ...slaSegments(data.sla_status).active.map((r) => ["Active", r.label, r.value]),
+              ...slaSegments(data.sla_status).finished.map((r) => ["Resolved & closed", r.label, r.value]),
+            ]} />}>
+            <SlaStatusChart sla={data.sla_status} />
+          </ChartCard>
 
           <div className="grid gap-4 lg:grid-cols-2">
             <ChartCard testId="chart-quick-wins" title="Quick wins matrix"
