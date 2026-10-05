@@ -60,7 +60,7 @@ export function DiscussionsView() {
                   onClick={() => router.replace(`${pathname}?issue=${t.id}`, { scroll: false })}
                   className={cn(
                     "flex w-full gap-3 border-b border-l-[3px] px-3 py-3 text-left transition-colors hover:bg-muted/50",
-                    t.id === selectedId ? "border-l-az-berry bg-[#fbe6f1]/40" : "border-l-transparent",
+                    t.id === selectedId ? "border-l-brand-berry bg-[#fbe6f1]/40" : "border-l-transparent",
                   )}
                 >
                   <div className="min-w-0 flex-1">
@@ -75,7 +75,7 @@ export function DiscussionsView() {
                   </div>
                   {t.unread_count > 0 && (
                     <span data-testid="unread-badge"
-                      className="mt-5 flex h-5 min-w-5 shrink-0 items-center justify-center rounded-full bg-az-berry px-1.5 text-[11px] font-semibold text-white">
+                      className="mt-5 flex h-5 min-w-5 shrink-0 items-center justify-center rounded-full bg-brand-berry px-1.5 text-[11px] font-semibold text-white">
                       {t.unread_count}
                     </span>
                   )}
@@ -88,7 +88,7 @@ export function DiscussionsView() {
         <section className="flex min-h-0 flex-col">
           {selectedId === null ? (
             <div className="flex flex-1 flex-col items-center justify-center gap-2 text-muted-foreground">
-              <MessagesSquare className="size-10 text-az-navy/30" />
+              <MessagesSquare className="size-10 text-brand-navy/30" />
               <p className="text-sm">Select a thread to start the conversation.</p>
             </div>
           ) : (
@@ -96,10 +96,10 @@ export function DiscussionsView() {
               <header className="flex items-center gap-3 border-b px-5 py-3">
                 <div className="min-w-0 flex-1">
                   <div className="font-mono text-[11px] text-muted-foreground">{issueKey(selectedId)}</div>
-                  <h2 className="truncate font-semibold text-az-navy" data-testid="thread-title">{current?.title ?? "…"}</h2>
+                  <h2 className="truncate font-semibold text-brand-navy" data-testid="thread-title">{current?.title ?? "…"}</h2>
                 </div>
                 {current && <><StatusPill value={current.status} /><PriorityPill value={current.priority} /></>}
-                <button type="button" className="text-xs font-medium text-az-berry hover:underline"
+                <button type="button" className="text-xs font-medium text-brand-berry hover:underline"
                   onClick={() => router.push(`/issues?issue=${selectedId}`)}>
                   Open issue
                 </button>

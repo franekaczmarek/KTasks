@@ -26,10 +26,10 @@ function Column({ laneId, status, label, tasks, showIssue, onMove, canMove, head
       ref={setNodeRef}
       data-testid={`column-${laneId}-${status}`}
       className={cn("flex flex-col gap-2 rounded-2xl bg-muted/60 p-2 transition-colors", header ? "min-h-28" : "min-h-12",
-        isOver && "bg-[#fbe6f1]/70 ring-2 ring-az-berry/30")}
+        isOver && "bg-[#fbe6f1]/70 ring-2 ring-brand-berry/30")}
     >
       {header && (
-        <div className="flex items-center justify-between px-1.5 pt-1 text-xs font-semibold uppercase tracking-wide text-az-navy">
+        <div className="flex items-center justify-between px-1.5 pt-1 text-xs font-semibold uppercase tracking-wide text-brand-navy">
           {label}
           <span className="rounded-full bg-card px-2 py-0.5 text-[11px] text-muted-foreground">{tasks.length}</span>
         </div>
@@ -82,14 +82,14 @@ export function KanbanBoard({ tasks, lanes, onMove, canMove, showIssue, actionsF
         columnsFor("board", tasks, true)
       ) : (
         <div className="space-y-4">
-          <div className="grid grid-cols-3 gap-3 pl-0 text-xs font-semibold uppercase tracking-wide text-az-navy">
+          <div className="grid grid-cols-3 gap-3 pl-0 text-xs font-semibold uppercase tracking-wide text-brand-navy">
             {TASK_COLUMNS.map((c) => <div key={c.status} className="px-3">{c.label}</div>)}
           </div>
           {lanes.map((lane) => {
             const laneTasks = tasks.filter((t) => (t.assignee_id ?? "unassigned") === lane.id);
             return (
               <section key={lane.id} data-testid={`lane-${lane.id}`} className="rounded-2xl bg-card p-3 shadow-sm">
-                <h3 className="mb-2 flex items-center gap-2 px-1 text-sm font-semibold text-az-navy">
+                <h3 className="mb-2 flex items-center gap-2 px-1 text-sm font-semibold text-brand-navy">
                   {lane.label}
                   <span className="text-xs font-normal text-muted-foreground">{laneTasks.length} tasks</span>
                 </h3>

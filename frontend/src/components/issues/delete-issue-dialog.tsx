@@ -41,7 +41,7 @@ export function DeleteIssueDialog({ issueId, title, onDeleted }: { issueId: numb
       <Dialog open={open} onOpenChange={setOpen}>
         <DialogContent className="sm:max-w-md" data-testid="delete-issue-dialog">
           <DialogHeader>
-            <DialogTitle className="text-az-navy">Delete {issueKey(issueId)}?</DialogTitle>
+            <DialogTitle className="text-brand-navy">Delete {issueKey(issueId)}?</DialogTitle>
             <DialogDescription>
               &ldquo;{title}&rdquo; and its tasks, discussion and attachments will disappear from KTasks for everyone.
               The deletion is recorded for audit, and the people involved will be notified.

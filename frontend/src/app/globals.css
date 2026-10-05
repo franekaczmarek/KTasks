@@ -5,14 +5,14 @@
 @custom-variant dark (&:is(.dark *));
 
 @theme inline {
-  /* AstraZeneca brand palette */
-  --color-az-navy: #00205b;
-  --color-az-berry: #d0006f;
-  --color-az-plum: #830051;
-  --color-az-bg: #f4f5f7;
-  --color-az-gold: #f0ab00;
-  --color-az-lime: #c4d600;
-  --color-az-sky: #68d2df;
+  /* Brand palette */
+  --color-brand-navy: #00205b;
+  --color-brand-berry: #d0006f;
+  --color-brand-plum: #830051;
+  --color-brand-bg: #f4f5f7;
+  --color-brand-gold: #f0ab00;
+  --color-brand-lime: #c4d600;
+  --color-brand-sky: #68d2df;
   --color-background: var(--background);
   --color-foreground: var(--foreground);
   --font-sans: var(--font-geist-sans);

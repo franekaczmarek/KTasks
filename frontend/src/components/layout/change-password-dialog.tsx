@@ -44,7 +44,7 @@ export function ChangePasswordDialog({ open, onOpenChange }: { open: boolean; on
     <Dialog open={open} onOpenChange={(o) => { if (!o) { reset(); change.reset(); } onOpenChange(o); }}>
       <DialogContent className="sm:max-w-sm" data-testid="change-password-dialog">
         <DialogHeader>
-          <DialogTitle className="text-az-navy">Change password</DialogTitle>
+          <DialogTitle className="text-brand-navy">Change password</DialogTitle>
           <DialogDescription>Confirm your current password, then choose a new one.</DialogDescription>
         </DialogHeader>
         <form id="change-password" className="space-y-3"
@@ -71,7 +71,7 @@ export function ChangePasswordDialog({ open, onOpenChange }: { open: boolean; on
         <DialogFooter>
           <Button variant="outline" onClick={() => onOpenChange(false)}>Cancel</Button>
           <Button type="submit" form="change-password" disabled={!valid || change.isPending}
-            className="bg-az-navy hover:bg-az-navy/90">
+            className="bg-brand-navy hover:bg-brand-navy/90">
             {change.isPending ? "Saving…" : "Change password"}
           </Button>
         </DialogFooter>

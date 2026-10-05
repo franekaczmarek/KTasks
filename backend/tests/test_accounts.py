@@ -51,7 +51,7 @@ def test_registration_validation(client, payload):
 
 
 def test_registration_domain_restriction(client, monkeypatch):
-    monkeypatch.setattr(get_settings(), "allowed_signup_domains", "astrazeneca.com, @ktasks.dev")
+    monkeypatch.setattr(get_settings(), "allowed_signup_domains", "example.com, @ktasks.dev")
     assert client.post("/auth/register", json={"email": f"{TEST_ACCOUNT_PREFIX}x@gmail.com", "name": "Outsider",
                                                "password": "Secret#2026"}).status_code == 403
     assert client.post("/auth/register", json={"email": new_email(), "name": "Insider",

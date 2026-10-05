@@ -23,7 +23,7 @@ def render(title: str, body: str, link: str | None) -> str:
         '<div style="font-family:Segoe UI,Arial,sans-serif;background:#F4F5F7;padding:24px">'
         '<div style="max-width:560px;margin:auto;background:#fff;border-radius:16px;overflow:hidden">'
         '<div style="background:#00205B;color:#fff;padding:16px 24px;font-weight:600">KTasks '
-        '<span style="color:#D0006F">·</span> AstraZeneca Pharma</div>'
+        '<span style="color:#D0006F">·</span> Issues &amp; Improvements</div>'
         f'<div style="padding:24px;color:#1b2233"><h2 style="margin:0 0 12px;color:#00205B;font-size:18px">'
         f'{html.escape(title)}</h2><p style="margin:0;line-height:1.5">{html.escape(body)}</p>{button}</div>'
         "</div></div>"

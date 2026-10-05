@@ -41,7 +41,7 @@ export function RejectIssueDialog({ issueId, onRejected }: { issueId: number; on
       <Dialog open={open} onOpenChange={setOpen}>
         <DialogContent className="sm:max-w-md" data-testid="reject-dialog">
           <DialogHeader>
-            <DialogTitle className="text-az-navy">Reject {issueKey(issueId)}?</DialogTitle>
+            <DialogTitle className="text-brand-navy">Reject {issueKey(issueId)}?</DialogTitle>
             <DialogDescription>
               Rejected issues are closed without work and can no longer be edited. The reporter and everyone in the
               thread will see your reason.

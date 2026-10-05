@@ -1,4 +1,4 @@
-# KTasks: Issue & Improvement Management (AstraZeneca Pharma)
+# KTasks: Issue & Improvement Management
 
 KTasks is an internal tool for reporting operational issues, routing them to the responsible Lead, working them on a Kanban board, and closing the loop with the reporter. Everything is measured against business-day SLAs.
 

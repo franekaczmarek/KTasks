@@ -50,7 +50,7 @@ export function NewTaskDialog({ issueId, open, onOpenChange, required, onCreated
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="sm:max-w-md">
         <DialogHeader>
-          <DialogTitle className="text-az-navy">{required ? "Plan the remaining work" : "New task"}</DialogTitle>
+          <DialogTitle className="text-brand-navy">{required ? "Plan the remaining work" : "New task"}</DialogTitle>
           <DialogDescription>
             {required
               ? "Add the next To Do task. Without one the issue is flagged \"No scheduled tasks in progress\"."
@@ -77,7 +77,7 @@ export function NewTaskDialog({ issueId, open, onOpenChange, required, onCreated
         <DialogFooter>
           <Button variant="outline" onClick={() => onOpenChange(false)}>Cancel</Button>
           <Button type="submit" form="new-task" disabled={title.trim().length < 2 || create.isPending}
-            className="bg-az-navy hover:bg-az-navy/90">
+            className="bg-brand-navy hover:bg-brand-navy/90">
             Add task
           </Button>
         </DialogFooter>

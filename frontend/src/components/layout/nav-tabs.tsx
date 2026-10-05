@@ -24,7 +24,7 @@ export function NavTabs() {
             aria-current={active ? "page" : undefined}
             className={cn(
               "flex items-center border-b-[3px] px-3 text-sm font-medium transition-colors",
-              active ? "border-az-berry text-white" : "border-transparent text-white/70 hover:text-white",
+              active ? "border-brand-berry text-white" : "border-transparent text-white/70 hover:text-white",
             )}
           >
             {tab.label}

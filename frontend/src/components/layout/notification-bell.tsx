@@ -62,17 +62,17 @@ export function NotificationBell() {
         <Bell className="size-5" />
         {unread > 0 && (
           <span data-testid="bell-count"
-            className="absolute -right-0.5 -top-0.5 flex h-4 min-w-4 items-center justify-center rounded-full bg-az-berry px-1 text-[10px] font-semibold text-white ring-2 ring-az-navy">
+            className="absolute -right-0.5 -top-0.5 flex h-4 min-w-4 items-center justify-center rounded-full bg-brand-berry px-1 text-[10px] font-semibold text-white ring-2 ring-brand-navy">
             {unread > 99 ? "99+" : unread}
           </span>
         )}
       </PopoverTrigger>
       <PopoverContent align="end" className="w-96 p-0" data-testid="notification-panel">
         <div className="flex items-center justify-between border-b px-4 py-3">
-          <div className="font-semibold text-az-navy">Notifications</div>
+          <div className="font-semibold text-brand-navy">Notifications</div>
           {unread > 0 && (
             <button type="button" onClick={() => markAll.mutate()}
-              className="text-xs font-medium text-az-berry hover:underline">
+              className="text-xs font-medium text-brand-berry hover:underline">
               Mark all as read
             </button>
           )}
@@ -86,12 +86,12 @@ export function NotificationBell() {
                 <button type="button" onClick={() => openItem(n)} data-unread={!n.read_status || undefined}
                   className={cn("flex w-full gap-3 border-b px-4 py-3 text-left text-sm last:border-0 hover:bg-muted/50",
                     !n.read_status && "bg-[#fbe6f1]/40")}>
-                  <Icon className={cn("mt-0.5 size-4 shrink-0", n.read_status ? "text-muted-foreground" : "text-az-plum")} />
+                  <Icon className={cn("mt-0.5 size-4 shrink-0", n.read_status ? "text-muted-foreground" : "text-brand-plum")} />
                   <span className="min-w-0 flex-1">
                     <span className={cn("line-clamp-2", !n.read_status && "font-medium")}>{n.message}</span>
                     <span className="text-xs text-muted-foreground">{timeAgo(n.created_at)}</span>
                   </span>
-                  {!n.read_status && <span className="mt-1.5 size-2 shrink-0 rounded-full bg-az-berry" aria-label="unread" />}
+                  {!n.read_status && <span className="mt-1.5 size-2 shrink-0 rounded-full bg-brand-berry" aria-label="unread" />}
                 </button>
               </li>
             );

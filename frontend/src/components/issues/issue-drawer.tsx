@@ -53,7 +53,7 @@ export function IssueDrawer({ issueId, onClose, children }: {
           </div>
         ) : (
           <>
-            <SheetHeader className="border-b bg-az-navy p-6 text-white">
+            <SheetHeader className="border-b bg-brand-navy p-6 text-white">
               <div className="font-mono text-xs text-white/60">{issueKey(issue.id)}</div>
               <SheetTitle className="text-lg text-white">{issue.title}</SheetTitle>
               <SheetDescription className="sr-only">Issue details, SLA metrics and activity</SheetDescription>
@@ -92,7 +92,7 @@ function Section({ title, icon, children, action }: {
   return (
     <section>
       <div className="mb-2 flex items-center justify-between">
-        <h3 className="flex items-center gap-1.5 text-sm font-semibold text-az-navy">{icon}{title}</h3>
+        <h3 className="flex items-center gap-1.5 text-sm font-semibold text-brand-navy">{icon}{title}</h3>
         {action}
       </div>
       {children}
@@ -104,7 +104,7 @@ function Stat({ label, value, hint }: { label: string; value: string; hint?: str
   return (
     <div className="rounded-xl bg-muted/60 p-3">
       <div className="text-[11px] font-medium uppercase tracking-wide text-muted-foreground">{label}</div>
-      <div className="mt-0.5 text-lg font-semibold text-az-navy">{value}</div>
+      <div className="mt-0.5 text-lg font-semibold text-brand-navy">{value}</div>
       {hint && <div className="text-xs text-muted-foreground">{hint}</div>}
     </div>
   );
@@ -243,7 +243,7 @@ function Blockers({ issue, canManage }: { issue: IssueDetail; canManage: boolean
       <ul className="space-y-2" data-testid="blockers">
         {issue.blockers.length === 0 && <li className="text-sm text-muted-foreground">No blockers recorded.</li>}
         {issue.blockers.map((b) => (
-          <li key={b.id} className={`flex items-start gap-3 rounded-xl border p-3 text-sm ${b.is_active ? "border-az-berry/40 bg-[#fbe6f1]/50" : ""}`}>
+          <li key={b.id} className={`flex items-start gap-3 rounded-xl border p-3 text-sm ${b.is_active ? "border-brand-berry/40 bg-[#fbe6f1]/50" : ""}`}>
             <div className="flex-1">
               <div className="font-medium">{b.reason}</div>
               <div className="text-xs text-muted-foreground">
@@ -288,7 +288,7 @@ function Attachments({ issue, canManage }: { issue: IssueDetail; canManage: bool
   return (
     <Section title={`Attachments (${issue.attachments.length})`} icon={<Paperclip className="size-4" />}
       action={canManage && issue.status !== "Closed" && issue.status !== "Rejected" && (
-        <label className="cursor-pointer text-xs font-medium text-az-berry hover:underline">
+        <label className="cursor-pointer text-xs font-medium text-brand-berry hover:underline">
           Add files
           <input type="file" multiple className="sr-only" aria-label="Add attachments"
             onChange={(e) => e.target.files?.length && upload.mutate(Array.from(e.target.files))} />
@@ -325,7 +325,7 @@ function ActivityLog({ issueId }: { issueId: number }) {
     <ol className="relative space-y-4 border-l-2 border-muted pl-5" data-testid="activity-log">
       {data.map((a) => (
         <li key={a.id} className="relative">
-          <span className="absolute -left-[27px] top-1 size-3 rounded-full border-2 border-white bg-az-berry" />
+          <span className="absolute -left-[27px] top-1 size-3 rounded-full border-2 border-white bg-brand-berry" />
           <div className="text-sm">
             <span className="font-medium">{a.user_name ?? "System"}</span> {describeActivity(a, users)}
           </div>

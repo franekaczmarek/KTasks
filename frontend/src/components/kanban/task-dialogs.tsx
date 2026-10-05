@@ -55,7 +55,7 @@ export function EditTaskDialog({ task, onClose }: { task: Task; onClose: () => v
     <Dialog open onOpenChange={(o) => !o && onClose()}>
       <DialogContent className="sm:max-w-md" data-testid="edit-task-dialog">
         <DialogHeader>
-          <DialogTitle className="text-az-navy">Edit task</DialogTitle>
+          <DialogTitle className="text-brand-navy">Edit task</DialogTitle>
           <DialogDescription>{issueKey(task.issue_id)} · {task.issue_title}</DialogDescription>
         </DialogHeader>
         <form id="edit-task" className="space-y-3" onSubmit={(e) => { e.preventDefault(); if (valid) save.mutate(); }}>
@@ -75,7 +75,7 @@ export function EditTaskDialog({ task, onClose }: { task: Task; onClose: () => v
         </form>
         <DialogFooter>
           <Button variant="outline" onClick={onClose}>Cancel</Button>
-          <Button type="submit" form="edit-task" disabled={!valid || save.isPending} className="bg-az-navy hover:bg-az-navy/90">
+          <Button type="submit" form="edit-task" disabled={!valid || save.isPending} className="bg-brand-navy hover:bg-brand-navy/90">
             Save changes
           </Button>
         </DialogFooter>
@@ -104,7 +104,7 @@ export function DeleteTaskDialog({ task, onClose, onCompletionPrompt }: {
     <Dialog open onOpenChange={(o) => !o && onClose()}>
       <DialogContent className="sm:max-w-md" data-testid="delete-task-dialog">
         <DialogHeader>
-          <DialogTitle className="text-az-navy">Delete task?</DialogTitle>
+          <DialogTitle className="text-brand-navy">Delete task?</DialogTitle>
           <DialogDescription>
             &ldquo;{task.title}&rdquo; will be removed from {issueKey(task.issue_id)}. The deletion is recorded in the
             issue&apos;s activity log.

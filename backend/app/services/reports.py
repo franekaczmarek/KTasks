@@ -123,7 +123,7 @@ def to_pdf(d: dict[str, Any]) -> bytes:
 
     story = [
         Paragraph("KTasks · Issue &amp; Improvement Report", h1),
-        Paragraph(f"AstraZeneca Pharma · {_scope_text(d)} · generated {_fmt(d['scope']['generated_at'])} UTC", small),
+        Paragraph(f"{_scope_text(d)} · generated {_fmt(d['scope']['generated_at'])} UTC", small),
         Spacer(1, 6),
         Paragraph("Key indicators", h2),
         table([["KPI", "Value"]] + [[k, str(_fmt(v))] for k, v in kpi_rows(d)], [110 * mm, 30 * mm]),

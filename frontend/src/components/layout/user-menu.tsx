@@ -36,7 +36,7 @@ export function UserMenu() {
       <DropdownMenu>
         <DropdownMenuTrigger
           aria-label="User menu"
-          className="flex size-8 items-center justify-center rounded-full bg-az-berry text-xs font-semibold text-white outline-none ring-white/60 focus-visible:ring-2"
+          className="flex size-8 items-center justify-center rounded-full bg-brand-berry text-xs font-semibold text-white outline-none ring-white/60 focus-visible:ring-2"
         >
           {me ? initials(me.name) : "…"}
         </DropdownMenuTrigger>

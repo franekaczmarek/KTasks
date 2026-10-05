@@ -64,7 +64,7 @@ export default function DashboardPage() {
         <div className="ml-auto">
           <DropdownMenu>
             <DropdownMenuTrigger
-              className="inline-flex h-8 items-center gap-1.5 rounded-lg bg-az-navy px-3 text-sm font-medium text-white hover:bg-az-navy/90">
+              className="inline-flex h-8 items-center gap-1.5 rounded-lg bg-brand-navy px-3 text-sm font-medium text-white hover:bg-brand-navy/90">
               <Download className="size-4" /> Export summary
             </DropdownMenuTrigger>
             <DropdownMenuContent align="end">

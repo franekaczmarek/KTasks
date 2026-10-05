@@ -40,7 +40,7 @@ export function ResolutionPanel({ issue }: { issue: IssueDetail }) {
             </p>
           </div>
           {isReporter && (
-            <Button className="shrink-0 bg-az-navy hover:bg-az-navy/90" disabled={confirm.isPending}
+            <Button className="shrink-0 bg-brand-navy hover:bg-brand-navy/90" disabled={confirm.isPending}
               onClick={() => confirm.mutate()}>
               <BadgeCheck /> Confirm Resolution
             </Button>

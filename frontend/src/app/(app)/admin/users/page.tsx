@@ -100,7 +100,7 @@ export default function UserManagementPage() {
                   </TableCell>
                   <TableCell className="text-sm text-muted-foreground">{u.email}</TableCell>
                   <TableCell>
-                    <Pill className={u.role === "lead" ? "bg-[#fbe6f1] text-az-plum" : "bg-[#e6ecf5] text-az-navy"}>
+                    <Pill className={u.role === "lead" ? "bg-[#fbe6f1] text-brand-plum" : "bg-[#e6ecf5] text-brand-navy"}>
                       {u.role === "lead" ? "Lead" : "Employee"}
                     </Pill>
                   </TableCell>
@@ -202,11 +202,11 @@ function AddUserDialog({ onCreated }: { onCreated: (s: { email: string; password
 
   return (
     <>
-      <Button className="bg-az-navy hover:bg-az-navy/90" onClick={() => setOpen(true)}><UserPlus /> Add user</Button>
+      <Button className="bg-brand-navy hover:bg-brand-navy/90" onClick={() => setOpen(true)}><UserPlus /> Add user</Button>
       <Dialog open={open} onOpenChange={setOpen}>
         <DialogContent className="sm:max-w-md">
           <DialogHeader>
-            <DialogTitle className="text-az-navy">Add user</DialogTitle>
+            <DialogTitle className="text-brand-navy">Add user</DialogTitle>
             <DialogDescription>The account is ready to use immediately. Leave the password empty to generate one.</DialogDescription>
           </DialogHeader>
           <form id="add-user" className="space-y-3" onSubmit={(e) => { e.preventDefault(); if (valid) create.mutate(); }}>
@@ -231,7 +231,7 @@ function AddUserDialog({ onCreated }: { onCreated: (s: { email: string; password
           </form>
           <DialogFooter>
             <Button variant="outline" onClick={() => setOpen(false)}>Cancel</Button>
-            <Button type="submit" form="add-user" disabled={!valid || create.isPending} className="bg-az-navy hover:bg-az-navy/90">
+            <Button type="submit" form="add-user" disabled={!valid || create.isPending} className="bg-brand-navy hover:bg-brand-navy/90">
               Create account
             </Button>
           </DialogFooter>
@@ -247,7 +247,7 @@ function PasswordDialog({ secret, onClose }: { secret: { email: string; password
     <Dialog open={secret !== null} onOpenChange={(o) => !o && onClose()}>
       <DialogContent className="sm:max-w-md" data-testid="password-dialog">
         <DialogHeader>
-          <DialogTitle className="text-az-navy">Temporary password</DialogTitle>
+          <DialogTitle className="text-brand-navy">Temporary password</DialogTitle>
           <DialogDescription>
             Share it securely with {secret?.email}. It is shown only once and is not stored in KTasks.
           </DialogDescription>

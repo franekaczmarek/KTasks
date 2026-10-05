@@ -23,7 +23,7 @@ export function StatTile({ label, value, hint, children, testId }: {
   return (
     <div className="rounded-2xl bg-card p-5 shadow-sm" data-testid={testId}>
       <div className="text-sm text-muted-foreground">{label}</div>
-      <div className="mt-1 text-3xl font-semibold tracking-tight text-az-navy" data-testid={testId && `${testId}-value`}>
+      <div className="mt-1 text-3xl font-semibold tracking-tight text-brand-navy" data-testid={testId && `${testId}-value`}>
         {value}
       </div>
       {hint && <div className="mt-1 text-xs text-muted-foreground">{hint}</div>}
@@ -62,7 +62,7 @@ export function ChartCard({ title, subtitle, table, children, className, testId 
     <section className={cn("rounded-2xl bg-card p-5 shadow-sm", className)} data-testid={testId}>
       <header className="mb-4 flex items-start justify-between gap-3">
         <div>
-          <h2 className="font-semibold text-az-navy">{title}</h2>
+          <h2 className="font-semibold text-brand-navy">{title}</h2>
           {subtitle && <p className="text-xs text-muted-foreground">{subtitle}</p>}
         </div>
         <div className="flex rounded-lg bg-muted p-0.5 text-xs" role="tablist" aria-label={`${title} view`}>
@@ -160,15 +160,15 @@ export function QuickWinsMatrix({ cells }: { cells: DashboardData["quick_wins"] 
               return (
                 <div key={e} data-testid={`qw-${p}-${e}`} data-quick-win={c.quick_win || undefined}
                   className={cn("group relative flex h-16 flex-col items-center justify-center rounded-[4px]",
-                    c.quick_win && "outline-2 -outline-offset-2 outline-solid outline-az-berry")}
+                    c.quick_win && "outline-2 -outline-offset-2 outline-solid outline-brand-berry")}
                   style={{ background: s < 0 ? EMPTY : RAMP[s] }}
                   tabIndex={c.count ? 0 : -1}
                   aria-label={`${p} priority, ${e} effort: ${c.count} open issues${c.quick_win ? " (quick win)" : ""}`}>
-                  <span className={cn("text-lg font-semibold", s < 0 ? "text-muted-foreground/60" : dark ? "text-white" : "text-az-navy")}>
+                  <span className={cn("text-lg font-semibold", s < 0 ? "text-muted-foreground/60" : dark ? "text-white" : "text-brand-navy")}>
                     {c.count}
                   </span>
                   {c.quick_win && (
-                    <span className={cn("text-[10px] font-medium uppercase tracking-wide", dark ? "text-white" : "text-az-plum")}>
+                    <span className={cn("text-[10px] font-medium uppercase tracking-wide", dark ? "text-white" : "text-brand-plum")}>
                       Quick win
                     </span>
                   )}

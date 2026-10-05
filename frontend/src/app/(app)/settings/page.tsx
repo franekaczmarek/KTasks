@@ -62,7 +62,7 @@ export default function SettingsPage() {
       <PageHeader title="Lead settings" description="Area ownership, absences and backup Leads." />
 
       <section className="rounded-2xl bg-card p-6 shadow-sm">
-        <h2 className="mb-4 font-semibold text-az-navy">Area leads</h2>
+        <h2 className="mb-4 font-semibold text-brand-navy">Area leads</h2>
         <div className="divide-y">
           {areaLeads.map((a) => (
             <div key={a.area} className="flex flex-wrap items-center gap-4 py-3" data-testid={`area-${a.area}`}>
@@ -80,7 +80,7 @@ export default function SettingsPage() {
       </section>
 
       <section className="rounded-2xl bg-card p-6 shadow-sm">
-        <h2 className="mb-4 font-semibold text-az-navy">Leads &amp; absences</h2>
+        <h2 className="mb-4 font-semibold text-brand-navy">Leads &amp; absences</h2>
         <div className="divide-y">
           {leads.map((l) => (
             <div key={l.id} className="flex flex-wrap items-center gap-4 py-3" data-testid={`lead-${l.email}`}>
@@ -110,7 +110,7 @@ export default function SettingsPage() {
 
       <section className="flex flex-wrap items-center gap-4 rounded-2xl bg-card p-6 shadow-sm">
         <div className="flex-1">
-          <h2 className="font-semibold text-az-navy">Auto-close</h2>
+          <h2 className="font-semibold text-brand-navy">Auto-close</h2>
           <p className="text-sm text-muted-foreground">
             Resolved issues close automatically after 5 business days without reporter confirmation. The check runs
             hourly; you can trigger it now.

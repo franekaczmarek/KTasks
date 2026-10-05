@@ -41,8 +41,8 @@ export default function RegisterPage() {
     <main className="flex min-h-screen items-center justify-center p-6">
       <div className="w-full max-w-sm rounded-2xl bg-card p-8 shadow-md">
         <div className="mb-6">
-          <div className="text-xs font-semibold uppercase tracking-widest text-az-berry">AstraZeneca Pharma</div>
-          <h1 className="mt-1 text-2xl font-semibold text-az-navy">Create your account</h1>
+          <div className="text-xs font-semibold uppercase tracking-widest text-brand-berry">KTasks</div>
+          <h1 className="mt-1 text-2xl font-semibold text-brand-navy">Create your account</h1>
           <p className="text-sm text-muted-foreground">
             New accounts start as <strong>Employee</strong>. A Lead can grant additional access.
           </p>
@@ -74,7 +74,7 @@ export default function RegisterPage() {
         </form>
         <p className="mt-6 text-center text-sm text-muted-foreground">
           Already have an account?{" "}
-          <Link href="/login" className="font-medium text-az-berry hover:underline">Sign in</Link>
+          <Link href="/login" className="font-medium text-brand-berry hover:underline">Sign in</Link>
         </p>
       </div>
     </main>

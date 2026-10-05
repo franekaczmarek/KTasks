@@ -62,7 +62,7 @@ export function WorkView() {
               <button key={v} type="button" role="tab" aria-selected={view === v}
                 onClick={() => setParams({ view: v === "focused" ? null : v })}
                 className={cn("flex items-center gap-1.5 rounded-md px-3 py-1.5 text-sm font-medium transition-colors",
-                  view === v ? "bg-az-navy text-white" : "text-muted-foreground hover:text-foreground")}>
+                  view === v ? "bg-brand-navy text-white" : "text-muted-foreground hover:text-foreground")}>
                 <Icon className="size-4" /> {label}
               </button>
             ))}
@@ -147,7 +147,7 @@ function FocusedBoard({ issueId, onSelectIssue, onMove, canMove, actionsFor }: {
             </Button>
           )}
           {canEdit && (
-            <Button className="bg-az-navy hover:bg-az-navy/90" onClick={() => setNewTaskOpen(true)}>
+            <Button className="bg-brand-navy hover:bg-brand-navy/90" onClick={() => setNewTaskOpen(true)}>
               <Plus /> New task
             </Button>
           )}
@@ -156,7 +156,7 @@ function FocusedBoard({ issueId, onSelectIssue, onMove, canMove, actionsFor }: {
 
       {issueId === null ? (
         <div className="flex flex-col items-center gap-2 rounded-2xl bg-card py-16 text-muted-foreground shadow-sm">
-          <ListPlus className="size-10 text-az-navy/30" />
+          <ListPlus className="size-10 text-brand-navy/30" />
           <p className="text-sm">Choose an issue to see its board.</p>
         </div>
       ) : isLoading || !tasks ? (

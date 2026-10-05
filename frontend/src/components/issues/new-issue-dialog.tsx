@@ -82,13 +82,13 @@ export function NewIssueDialog({ onCreated }: { onCreated: (issue: Issue) => voi
 
   return (
     <>
-      <Button onClick={() => setOpen(true)} className="bg-az-navy hover:bg-az-navy/90">
+      <Button onClick={() => setOpen(true)} className="bg-brand-navy hover:bg-brand-navy/90">
         <Plus /> Report issue
       </Button>
       <Dialog open={open} onOpenChange={setOpen}>
         <DialogContent className="sm:max-w-xl">
           <DialogHeader>
-            <DialogTitle className="text-az-navy">Report a new issue</DialogTitle>
+            <DialogTitle className="text-brand-navy">Report a new issue</DialogTitle>
             <DialogDescription>It will be routed to the Lead responsible for the selected area.</DialogDescription>
           </DialogHeader>
           <form
@@ -160,7 +160,7 @@ export function NewIssueDialog({ onCreated }: { onCreated: (issue: Issue) => voi
           <DialogFooter>
             <Button variant="outline" onClick={() => setOpen(false)}>Cancel</Button>
             <Button type="submit" form="new-issue" disabled={!valid || create.isPending}
-              className="bg-az-navy hover:bg-az-navy/90">
+              className="bg-brand-navy hover:bg-brand-navy/90">
               {create.isPending ? "Submitting…" : "Submit issue"}
             </Button>
           </DialogFooter>

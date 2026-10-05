@@ -61,7 +61,7 @@ export function CompletionDialog({ issueId, onClose }: { issueId: number | null;
     <Dialog open onOpenChange={(open) => !open && close()}>
       <DialogContent className="sm:max-w-md" data-testid="completion-dialog">
         <DialogHeader>
-          <DialogTitle className="flex items-center gap-2 text-az-navy">
+          <DialogTitle className="flex items-center gap-2 text-brand-navy">
             <CheckCircle2 className="size-5 text-emerald-600" /> All tasks are done
           </DialogTitle>
           <DialogDescription>Are all works on this issue ({issueKey(issueId)}) completed?</DialogDescription>
@@ -77,14 +77,14 @@ export function CompletionDialog({ issueId, onClose }: { issueId: number | null;
           {step === "ask" ? (
             <>
               <Button variant="outline" onClick={() => setStep("new-task")}>No, more work needed</Button>
-              <Button className="bg-az-navy hover:bg-az-navy/90" onClick={() => setStep("root-cause")}>
+              <Button className="bg-brand-navy hover:bg-brand-navy/90" onClick={() => setStep("root-cause")}>
                 Yes, resolve issue
               </Button>
             </>
           ) : (
             <>
               <Button variant="outline" onClick={() => setStep("ask")}>Back</Button>
-              <Button className="bg-az-navy hover:bg-az-navy/90" disabled={!rootCause || resolve.isPending}
+              <Button className="bg-brand-navy hover:bg-brand-navy/90" disabled={!rootCause || resolve.isPending}
                 onClick={() => resolve.mutate()}>
                 Mark as Resolved
               </Button>

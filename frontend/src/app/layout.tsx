@@ -9,13 +9,13 @@ const geistMono = Geist_Mono({ variable: "--font-geist-mono", subsets: ["latin"]
 
 export const metadata: Metadata = {
   title: "KTasks · Issue & Improvement Management",
-  description: "AstraZeneca Pharma issue and improvement management system",
+  description: "Issue and improvement management system",
 };
 
 export default function RootLayout({ children }: LayoutProps<"/">) {
   return (
     <html lang="en" className={`${geistSans.variable} ${geistMono.variable} h-full antialiased`}>
-      <body className="min-h-full flex flex-col bg-az-bg">
+      <body className="min-h-full flex flex-col bg-brand-bg">
         <Providers>{children}</Providers>
       </body>
     </html>

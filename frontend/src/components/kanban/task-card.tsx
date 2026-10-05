@@ -39,8 +39,8 @@ export function TaskCard({ task, showIssue, onMove, disabled, actions }: {
       data-testid={`task-${task.id}`}
       className={cn(
         "group rounded-xl border bg-card p-3 shadow-sm transition-shadow",
-        isDragging ? "z-50 shadow-lg ring-2 ring-az-berry/40" : "hover:shadow-md",
-        task.issue_blocked && "border-az-berry/40",
+        isDragging ? "z-50 shadow-lg ring-2 ring-brand-berry/40" : "hover:shadow-md",
+        task.issue_blocked && "border-brand-berry/40",
       )}
     >
       <div className="flex items-start gap-1.5">
@@ -95,11 +95,11 @@ export function TaskCard({ task, showIssue, onMove, disabled, actions }: {
         )}
       </div>
       <div className="mt-2 flex items-center gap-1.5">
-        {task.issue_blocked && <Pill className="bg-az-berry px-2 text-[10px] text-white"><Ban className="size-3" />BLOCKED</Pill>}
+        {task.issue_blocked && <Pill className="bg-brand-berry px-2 text-[10px] text-white"><Ban className="size-3" />BLOCKED</Pill>}
         <span className="ml-auto flex items-center gap-1.5 text-[11px] text-muted-foreground">
           {task.assignee_name ?? "Unassigned"}
           <span className={cn("flex size-5 items-center justify-center rounded-full text-[9px] font-semibold text-white",
-            task.assignee_name ? "bg-az-navy" : "bg-muted-foreground/40")}>
+            task.assignee_name ? "bg-brand-navy" : "bg-muted-foreground/40")}>
             {task.assignee_name ? initials(task.assignee_name) : "?"}
           </span>
         </span>

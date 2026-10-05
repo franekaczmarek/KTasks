@@ -56,8 +56,8 @@ export default function LoginPage() {
     <main className="flex min-h-screen items-center justify-center p-6">
       <div className="w-full max-w-sm rounded-2xl bg-card p-8 shadow-md">
         <div className="mb-6">
-          <div className="text-xs font-semibold uppercase tracking-widest text-az-berry">AstraZeneca Pharma</div>
-          <h1 className="mt-1 text-2xl font-semibold text-az-navy">KTasks</h1>
+          <div className="text-xs font-semibold uppercase tracking-widest text-brand-berry">Welcome back</div>
+          <h1 className="mt-1 text-2xl font-semibold text-brand-navy">KTasks</h1>
           <p className="text-sm text-muted-foreground">Issue &amp; Improvement Management</p>
         </div>
         <Suspense>
@@ -65,7 +65,7 @@ export default function LoginPage() {
         </Suspense>
         <p className="mt-6 text-center text-sm text-muted-foreground">
           New to KTasks?{" "}
-          <Link href="/register" className="font-medium text-az-berry hover:underline">Create an account</Link>
+          <Link href="/register" className="font-medium text-brand-berry hover:underline">Create an account</Link>
         </p>
       </div>
     </main>

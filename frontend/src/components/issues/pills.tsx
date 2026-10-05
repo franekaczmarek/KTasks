@@ -26,14 +26,14 @@ const PRIORITY: Record<Priority, string> = {
 
 const STATUS: Record<IssueStatus, string> = {
   New: "bg-indigo-100 text-indigo-800",
-  "In Progress": "bg-[#fbe6f1] text-az-plum",
+  "In Progress": "bg-[#fbe6f1] text-brand-plum",
   Resolved: "bg-emerald-100 text-emerald-800",
   Closed: "bg-slate-200 text-slate-700",
   Rejected: "bg-slate-700 text-white",
 };
 
 const AREA: Record<Area, string> = {
-  Operations: "bg-[#e6ecf5] text-az-navy",
+  Operations: "bg-[#e6ecf5] text-brand-navy",
   Process: "bg-cyan-50 text-cyan-800",
   Improvements: "bg-lime-100 text-lime-800",
 };
@@ -52,7 +52,7 @@ export const AreaPill = ({ value }: { value: Area }) => <Pill className={AREA[va
 
 export function BlockedPill() {
   return (
-    <Pill className="bg-az-berry text-white" data-testid="blocked-badge">
+    <Pill className="bg-brand-berry text-white" data-testid="blocked-badge">
       <Ban className="size-3" /> BLOCKED
     </Pill>
   );

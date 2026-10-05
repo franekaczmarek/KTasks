@@ -9,6 +9,7 @@ test("unauthenticated users are redirected to login", async ({ page }) => {
 
 test("wrong password shows an error", async ({ page }) => {
   await page.goto("/login");
+  await expect(page.getByRole("heading", { name: "KTasks" })).toBeVisible();
   await page.getByLabel("Email").fill(USERS.employee);
   await page.getByLabel("Password").fill("wrong-password");
   await page.getByRole("button", { name: "Sign in" }).click();

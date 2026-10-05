@@ -53,7 +53,7 @@ export function ChatThread({ issueId }: { issueId: number }) {
 
   return (
     <>
-      <div className="min-h-0 flex-1 space-y-4 overflow-y-auto bg-az-bg/60 px-5 py-4" data-testid="chat-messages">
+      <div className="min-h-0 flex-1 space-y-4 overflow-y-auto bg-brand-bg/60 px-5 py-4" data-testid="chat-messages">
         {isSuccess && comments.length === 0 && (
           <p className="pt-10 text-center text-sm text-muted-foreground">No messages yet: start the discussion.</p>
         )}
@@ -78,7 +78,7 @@ export function ChatThread({ issueId }: { issueId: number }) {
           className="min-h-0 resize-none"
         />
         <Button type="submit" size="icon-lg" aria-label="Send" disabled={!draft.trim() || send.isPending}
-          className="bg-az-navy hover:bg-az-navy/90">
+          className="bg-brand-navy hover:bg-brand-navy/90">
           <SendHorizontal />
         </Button>
       </form>
@@ -105,13 +105,13 @@ function Message({ comment, own, issueId }: { comment: Comment; own: boolean; is
   return (
     <div className={cn("group flex gap-2.5", own && "flex-row-reverse")} data-testid={`comment-${comment.id}`}>
       <div className={cn("flex size-8 shrink-0 items-center justify-center rounded-full text-[11px] font-semibold text-white",
-        comment.user_role === "lead" ? "bg-az-berry" : "bg-az-navy")}>
+        comment.user_role === "lead" ? "bg-brand-berry" : "bg-brand-navy")}>
         {initials(comment.user_name)}
       </div>
       <div className={cn("max-w-[75%]", own && "items-end text-right")}>
         <div className="mb-0.5 text-xs text-muted-foreground">
           <span className="font-medium text-foreground">{comment.user_name}</span>
-          {comment.user_role === "lead" && <span className="ml-1 text-az-berry">Lead</span>} · {fmtDateTime(comment.created_at)}
+          {comment.user_role === "lead" && <span className="ml-1 text-brand-berry">Lead</span>} · {fmtDateTime(comment.created_at)}
           {comment.is_edited && <span className="ml-1 italic">(edited)</span>}
         </div>
         {editing ? (
@@ -132,7 +132,7 @@ function Message({ comment, own, issueId }: { comment: Comment; own: boolean; is
               </button>
             )}
             <div className={cn("whitespace-pre-wrap rounded-2xl px-3.5 py-2 text-left text-sm shadow-sm",
-              own ? "rounded-tr-sm bg-az-navy text-white" : "rounded-tl-sm bg-card")}>
+              own ? "rounded-tr-sm bg-brand-navy text-white" : "rounded-tl-sm bg-card")}>
               {comment.content}
             </div>
           </div>
