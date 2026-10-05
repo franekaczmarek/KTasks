@@ -46,6 +46,9 @@ export interface Metrics {
   blocker_time_days: number;
   active_work_days: number | null;
   sla_target_days: number;
+  /** "agreed": measured against the agreed due date; "priority": against the priority target. */
+  sla_basis: "agreed" | "priority";
+  sla_deadline: string;
   sla_used_pct: number;
   sla_state: SlaState;
   is_blocked: boolean;
@@ -105,8 +108,24 @@ export interface Attachment {
   url: string | null;
 }
 
+export interface DueDateRequest {
+  id: number;
+  from_date: string;
+  to_date: string;
+  reason: string;
+  status: "pending" | "accepted" | "declined" | "withdrawn";
+  decision_note: string | null;
+  created_at: string;
+  decided_at: string | null;
+  requested_by_user_id: string;
+  requested_by_name: string;
+  decided_by_name: string | null;
+}
+
 export interface IssueDetail extends Issue {
   attachments: Attachment[];
+  pending_due_date_request: DueDateRequest | null;
+  due_date_history: DueDateRequest[];
   participants: { id: string; name: string; role: Role }[];
 }
 
@@ -206,6 +225,12 @@ export interface DashboardData {
     sla_met_count: number;
   };
   status_counts: Record<IssueStatus, number>;
+  sla_status: {
+    active: { on_track: number; at_risk: number; breached: number };
+    finished: { met: number; breached: number };
+    agreed_count: number;
+    pending_requests: number;
+  };
   quick_wins: {
     priority: Priority; effort: Effort; count: number; quick_win: boolean;
     issues: { id: number; title: string; status: IssueStatus }[];

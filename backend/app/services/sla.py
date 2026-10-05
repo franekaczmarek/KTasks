@@ -3,7 +3,11 @@ from datetime import UTC, datetime
 from typing import Any
 
 from app.config import get_settings
-from app.services.business_days import DAY_SECONDS, add_business_days, business_seconds, business_seconds_union
+from app.services.business_days import (
+    DAY_SECONDS, add_business_days, business_seconds, business_seconds_union, end_of_day,
+)
+
+MIN_WINDOW_SECONDS = 3600  # a due date on/before the creation day still gives a non-zero window
 
 
 def now() -> datetime:
@@ -37,8 +41,16 @@ def compute_metrics(
     blocked_s = business_seconds_union(intervals, created, end)
     blocked_in_cycle_s = business_seconds_union(intervals, started, end) if started else 0.0
 
-    target = s.sla_targets[issue["priority"]]
-    ratio = lead_s / (target * DAY_SECONDS)
+    # SLA deadline: the agreed due date (end of that local day) once a Lead has set one,
+    # otherwise created_at + the priority target in business days.
+    due = issue.get("expected_end_date")
+    if due:
+        basis, deadline = "agreed", end_of_day(due)
+        window_s = max(business_seconds(created, deadline), MIN_WINDOW_SECONDS)
+    else:
+        basis, window_s = "priority", s.sla_targets[issue["priority"]] * DAY_SECONDS
+        deadline = add_business_days(created, s.sla_targets[issue["priority"]])
+    ratio = lead_s / window_s
     finished = issue["status"] in ("Resolved", "Closed")
     if issue["status"] == "Rejected":
         sla_state = "n_a"  # rejected issues are excluded from SLA compliance
@@ -60,7 +72,9 @@ def compute_metrics(
         "cycle_time_days": _days(cycle_s) if started else None,
         "blocker_time_days": _days(blocked_s),
         "active_work_days": _days(max(cycle_s - blocked_in_cycle_s, 0.0)) if started else None,
-        "sla_target_days": target,
+        "sla_target_days": round(window_s / DAY_SECONDS, 1),
+        "sla_basis": basis,
+        "sla_deadline": deadline,
         "sla_used_pct": round(ratio * 100, 1),
         "sla_state": sla_state,
         "is_blocked": any(b["is_active"] for b in blockers),

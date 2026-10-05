@@ -23,6 +23,15 @@ def _midnight(d: date) -> datetime:
     return datetime.combine(d, time.min, tzinfo=_tz())
 
 
+def end_of_day(d: date) -> datetime:
+    """The instant a local calendar day ends (next local midnight): deadline of a due date."""
+    return _midnight(d + timedelta(days=1))
+
+
+def local_today() -> date:
+    return datetime.now(_tz()).date()
+
+
 def _is_business_day(d: date) -> bool:
     return d.weekday() < 5
 

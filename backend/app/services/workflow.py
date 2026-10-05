@@ -15,6 +15,12 @@ from app.services.sla import now
 OPEN_TASK_SQL = "select count(*) as n from public.tasks where issue_id = :i and status in ('ToDo', 'InProgress')"
 
 
+def close_pending_due_date(conn: Connection, issue_id: int, at: datetime, note: str) -> None:
+    """A pending due-date change request is moot once the issue leaves active work."""
+    execute(conn, "update public.due_date_requests set status = 'withdrawn', decided_at = :t, decision_note = :n "
+                  "where issue_id = :id and status = 'pending'", t=at, n=note, id=issue_id)
+
+
 def open_task_count(conn: Connection, issue_id: int) -> int:
     return fetch_one(conn, OPEN_TASK_SQL, i=issue_id)["n"]
 
@@ -53,6 +59,7 @@ def resolve_issue(conn: Connection, issue: dict[str, Any], user: dict[str, Any],
         "resolved_by_user_id = :u where id = :id",
         rc=root_cause, t=now(), u=user["id"], id=issue["id"],
     )
+    close_pending_due_date(conn, issue["id"], now(), "Issue resolved")
     log_activity(conn, issue["id"], user["id"], "resolved", root_cause=root_cause)
     notify(conn, [issue["creator_id"]], "verification_request",
            f"KT-{issue['id']} was resolved: please confirm the resolution of \"{issue['title']}\"",
@@ -110,6 +117,7 @@ def reject_issue(conn: Connection, issue: dict[str, Any], user: dict[str, Any], 
     # Open blockers stop counting once the issue is rejected.
     execute(conn, "update public.blockers set is_active = false, resolved_at = :t where issue_id = :id and is_active",
             t=at, id=issue["id"])
+    close_pending_due_date(conn, issue["id"], at, "Issue rejected")
     log_activity(conn, issue["id"], user["id"], "rejected", reason=reason, **{"from": issue["status"]})
     notify(conn, issue_audience(conn, issue["id"]), "issue_rejected",
            f"KT-{issue['id']} was rejected by {user['name']}: {reason}",
@@ -129,6 +137,7 @@ def delete_issue(conn: Connection, issue: dict[str, Any], user: dict[str, Any], 
                   "where id = :id", t=at, u=user["id"], r=reason, id=issue["id"])
     execute(conn, "update public.blockers set is_active = false, resolved_at = :t where issue_id = :id and is_active",
             t=at, id=issue["id"])
+    close_pending_due_date(conn, issue["id"], at, "Issue deleted")
     log_activity(conn, issue["id"], user["id"], "deleted", reason=reason, status=issue["status"])
     notify(conn, issue_audience(conn, issue["id"]), "issue_deleted",
            f"KT-{issue['id']} \"{issue['title']}\" was deleted by {user['name']}" + (f": {reason}" if reason else ""),

@@ -118,10 +118,10 @@ def test_lead_edits_are_audited(client, make_issue, users, db, sent_emails):
     log = client.get(f"/issues/{iid}/activity", headers=auth(EMPLOYEE)).json()
     kinds = [a["action_type"] for a in log]
     # The two fields of the first PATCH are logged in schema order; the rest are sequential.
-    assert kinds[0] == "created" and sorted(kinds[1:3]) == ["date_changed", "updated"]
+    assert kinds[0] == "created" and sorted(kinds[1:3]) == ["due_date_set", "updated"]
     assert kinds[3:] == ["reassigned", "status_changed"]
-    date_entry = next(a for a in log if a["action_type"] == "date_changed")
-    assert date_entry["details"] == {"field": "expected_end_date", "from": None, "to": "2026-12-01"}
+    date_entry = next(a for a in log if a["action_type"] == "due_date_set")
+    assert date_entry["details"] == {"date": "2026-12-01"}
     reassigned = next(a for a in log if a["action_type"] == "reassigned")
     assert reassigned["user_name"] == "Anna Nowak"
     assert reassigned["details"] == {"from": users[LEAD]["id"], "to": users[LEAD2]["id"]}

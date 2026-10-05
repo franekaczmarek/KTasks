@@ -15,6 +15,7 @@ from app.services.activity import log_activity
 from app.services.issue_queries import load_issue, load_issues
 from app.services.notifications import notify
 from app.services.routing import resolve_lead
+from app.services.business_days import local_today
 from app.services.sla import now
 from app.services.workflow import delete_issue
 
@@ -131,17 +132,16 @@ def create_issue(
     priority: Annotated[Priority, Form()],
     effort: Annotated[Effort, Form()],
     summary: Annotated[str, Form(max_length=5000)] = "",
-    expected_end_date: Annotated[date | None, Form()] = None,
     files: Annotated[list[UploadFile], File()] = [],  # noqa: B006
 ):
     route = resolve_lead(db, area)
     lead_id = route["effective_lead_id"] if route else None
     row = fetch_one(
         db,
-        """insert into public.issues (title, summary, area, priority, effort, expected_end_date, creator_id, lead_id)
-           values (:title, :summary, :area, :priority, :effort, :eed, :creator, :lead) returning id""",
+        """insert into public.issues (title, summary, area, priority, effort, creator_id, lead_id)
+           values (:title, :summary, :area, :priority, :effort, :creator, :lead) returning id""",
         title=title.strip(), summary=summary.strip(), area=area, priority=priority, effort=effort,
-        eed=expected_end_date, creator=user["id"], lead=lead_id,
+        creator=user["id"], lead=lead_id,
     )
     issue_id = row["id"]
     add_participant(db, issue_id, user["id"])
@@ -179,6 +179,15 @@ def get_issue(issue_id: int, db: DB, _: CurrentUser):
     for a in attachments:
         a["url"] = urls.get(a.pop("storage_path"))
     issue["attachments"] = attachments
+    requests = fetch_all(
+        db, """select r.id, r.from_date, r.to_date, r.reason, r.status, r.decision_note, r.created_at, r.decided_at,
+                      r.requested_by_user_id, u.name as requested_by_name, d.name as decided_by_name
+               from public.due_date_requests r join public.users u on u.id = r.requested_by_user_id
+               left join public.users d on d.id = r.decided_by_user_id
+               where r.issue_id = :id order by r.created_at desc limit 10""", id=issue_id,
+    )
+    issue["pending_due_date_request"] = next((r for r in requests if r["status"] == "pending"), None)
+    issue["due_date_history"] = [r for r in requests if r["status"] != "pending"]
     issue["participants"] = fetch_all(
         db, "select u.id, u.name, u.role from public.issue_participants p join public.users u on u.id = p.user_id "
             "where p.issue_id = :id order by p.joined_at", id=issue_id,
@@ -245,6 +254,12 @@ def update_issue(issue_id: int, body: IssuePatch, db: DB, user: LeadUser, backgr
         new_lead = fetch_one(db, "select id, name, role from public.users where id = :id", id=changes["lead_id"])
         if new_lead is None or new_lead["role"] != "lead":
             raise HTTPException(422, "Issues can only be assigned to Leads")
+    # The agreed due date (= SLA deadline) is set once; later changes go through reporter approval.
+    if "expected_end_date" in changes:
+        if issue["expected_end_date"] is not None:
+            raise HTTPException(409, "The due date is already agreed: request a change for the reporter to approve")
+        if changes["expected_end_date"] < local_today():
+            raise HTTPException(422, "The due date cannot be in the past")
     if not changes:
         return load_issue(db, issue_id)
 
@@ -263,7 +278,10 @@ def update_issue(issue_id: int, body: IssuePatch, db: DB, user: LeadUser, backgr
                    issue_id=issue_id, link=f"/issues?issue={issue_id}", exclude=user["id"],
                    email_leads=True, background=background, subject=f"[KTasks] KT-{issue_id} reassigned to you")
         elif field == "expected_end_date":
-            log_activity(db, issue_id, user["id"], "date_changed", field=field, **{"from": old, "to": new})
+            log_activity(db, issue_id, user["id"], "due_date_set", date=new)
+            notify(db, [issue["creator_id"]], "due_date_set",
+                   f"{user['name']} set the due date of KT-{issue_id} to {new:%d.%m.%Y}: {issue['title']}",
+                   issue_id=issue_id, link=f"/issues?issue={issue_id}", exclude=user["id"])
         elif field == "status":
             log_activity(db, issue_id, user["id"], "status_changed", **{"from": old, "to": new})
         else:

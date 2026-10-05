@@ -1,6 +1,7 @@
 import { cn } from "cn";
 import { Ban } from "lucide-react";
 
+import { fmtDateTime } from "@/lib/format";
 import type { Area, IssueStatus, Metrics, Priority, SlaState } from "@/lib/types";
 
 export function Pill({ className, children, ...props }: React.ComponentProps<"span">) {
@@ -60,8 +61,10 @@ export function BlockedPill() {
 
 export function SlaBadge({ metrics }: { metrics: Metrics }) {
   const s = SLA[metrics.sla_state];
+  const basis = metrics.sla_basis === "agreed" ? "agreed date" : "priority target";
   return (
-    <Pill className={s.cls} title={`${metrics.lead_time_days} of ${metrics.sla_target_days} business days used`}
+    <Pill className={s.cls}
+      title={`${metrics.lead_time_days} of ${metrics.sla_target_days} business days used · due ${fmtDateTime(metrics.sla_deadline)} (${basis})`}
       data-testid="sla-badge">
       {metrics.sla_state === "n_a" ? s.label : `${s.label} · ${metrics.sla_used_pct.toFixed(0)}%`}
     </Pill>

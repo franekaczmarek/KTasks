@@ -18,6 +18,7 @@ import { fmtBytes, fmtDate, fmtDateTime, fmtDays, issueKey } from "@/lib/format"
 import { PRIORITIES, type ActivityEntry, type IssueDetail, type User } from "@/lib/types";
 
 import { DeleteIssueDialog } from "./delete-issue-dialog";
+import { DueDateControl, DueDateRequestBanner } from "./due-date";
 import { AreaPill, BlockedPill, PriorityPill, SlaBadge, StatusPill } from "./pills";
 import { RejectIssueDialog } from "./reject-dialog";
 
@@ -121,11 +122,13 @@ function Overview({ issue, onDeleted }: { issue: IssueDetail; onDeleted: () => v
   return (
     <>
       {issue.summary && <p className="whitespace-pre-wrap text-sm leading-relaxed">{issue.summary}</p>}
+      <DueDateRequestBanner issue={issue} />
 
       <Section title="SLA & time (business days)" icon={<Clock className="size-4" />}
         action={<SlaBadge metrics={m} />}>
         <div className="grid grid-cols-2 gap-2 sm:grid-cols-4" data-testid="sla-breakdown">
-          <Stat label="Lead time" value={fmtDays(m.lead_time_days)} hint={`target ${m.sla_target_days} bd`} />
+          <Stat label="Lead time" value={fmtDays(m.lead_time_days)} hint={m.sla_basis === "agreed"
+            ? `due ${fmtDate(issue.expected_end_date)} (agreed)` : `target ${m.sla_target_days} bd (${issue.priority})`} />
           <Stat label="Cycle time" value={fmtDays(m.cycle_time_days)} hint={issue.start_date ? "since start" : "not started"} />
           <Stat label="Active work" value={fmtDays(m.active_work_days)} />
           <Stat label="Blocker time" value={fmtDays(m.blocker_time_days)} />
@@ -145,7 +148,7 @@ function Overview({ issue, onDeleted }: { issue: IssueDetail; onDeleted: () => v
             ["Lead", issue.lead_name ?? "—"],
             ["Created", fmtDateTime(issue.created_at)],
             ["Started", fmtDateTime(issue.start_date)],
-            ["Expected end", fmtDate(issue.expected_end_date)],
+            ["Due date", issue.expected_end_date ? `${fmtDate(issue.expected_end_date)} (agreed)` : "Not agreed yet"],
             ["Effort", issue.effort],
             ["Root cause", issue.root_cause ?? "—"],
             ["Resolved", issue.resolved_at ? `${fmtDateTime(issue.resolved_at)} by ${issue.resolved_by_name ?? "—"}` : "—"],
@@ -211,13 +214,11 @@ function LeadControls({ issue, users }: { issue: IssueDetail; users: User[] }) {
           <SimpleSelect aria-label="Reassign lead" value={issue.lead_id} options={leads}
             onChange={(lead_id) => patch.mutate({ lead_id })} />
         </label>
-        <label className="space-y-1">
-          <span className="text-xs text-muted-foreground">Expected end</span>
-          <Input type="date" aria-label="Expected end date" className="h-8" defaultValue={issue.expected_end_date ?? ""}
-            key={issue.expected_end_date}
-            onBlur={(e) => e.target.value !== (issue.expected_end_date ?? "") &&
-              patch.mutate({ expected_end_date: e.target.value || null })} />
-        </label>
+        {/* Not a <label>: it holds buttons, which a wrapping label would rename. */}
+        <div className="space-y-1">
+          <span className="text-xs text-muted-foreground">Due date (SLA)</span>
+          <DueDateControl issue={issue} onSet={(expected_end_date) => patch.mutate({ expected_end_date })} />
+        </div>
       </div>
     </Section>
   );

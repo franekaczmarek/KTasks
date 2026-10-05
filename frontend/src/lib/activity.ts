@@ -1,3 +1,4 @@
+import { fmtDate } from "@/lib/format";
 import type { ActivityEntry, User } from "@/lib/types";
 
 const FIELD_LABELS: Record<string, string> = {
@@ -17,6 +18,18 @@ export function describeActivity(a: ActivityEntry, users: User[] = []): string {
       return `changed status from ${val(d.from)} to ${val(d.to)}`;
     case "date_changed":
       return `changed expected end date from ${val(d.from)} to ${val(d.to)}`;
+    case "due_date_set":
+      return `set the due date to ${fmtDate(String(d.date))}`;
+    case "due_date_change_requested":
+      return `asked to move the due date from ${fmtDate(String(d.from))} to ${fmtDate(String(d.to))}: "${d.reason}"`;
+    case "due_date_change_accepted":
+      return d.self_approved
+        ? `moved the due date from ${fmtDate(String(d.from))} to ${fmtDate(String(d.to))} (own issue, self-approved)`
+        : `accepted the due date change to ${fmtDate(String(d.to))}`;
+    case "due_date_change_declined":
+      return `declined the due date change to ${fmtDate(String(d.to))}${d.note ? `: "${d.note}"` : ""}`;
+    case "due_date_change_withdrawn":
+      return `withdrew the due date change to ${fmtDate(String(d.to))}`;
     case "updated":
       return `changed ${FIELD_LABELS[String(d.field)] ?? d.field} from ${val(d.from)} to ${val(d.to)}`;
     case "reassigned":

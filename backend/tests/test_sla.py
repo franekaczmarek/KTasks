@@ -1,5 +1,5 @@
 """Unit tests for SLA states, blocker metrics and the Red Alert rule."""
-from datetime import datetime
+from datetime import date, datetime
 from zoneinfo import ZoneInfo
 
 from app.services.sla import compute_metrics
@@ -57,3 +57,26 @@ def test_red_alert_rule():
     assert compute_metrics(in_progress, [], {}, at=at(7))["red_alert"] is False   # no tasks yet
     assert compute_metrics(issue(status="Resolved", resolved_at=at(7)), [], {"Done": 3},
                            at=at(7))["red_alert"] is False
+
+
+def test_agreed_due_date_replaces_priority_target():
+    # Critical (2 bd target) agreed for Fri 16.10: the deadline is the end of that day = 10 business days.
+    agreed = issue(priority="Critical", expected_end_date=date(2026, 10, 16))
+    m = compute_metrics(agreed, [], at=at(8))                                       # 3 bd used of 10
+    assert m["sla_basis"] == "agreed" and m["sla_target_days"] == 9.6 and m["sla_state"] == "on_track"
+    assert m["sla_deadline"] == datetime(2026, 10, 17, tzinfo=WAW)
+    assert compute_metrics(agreed, [], at=at(15))["sla_state"] == "at_risk"        # 8 bd of 9.6
+    assert compute_metrics(agreed, [], at=at(19))["sla_state"] == "breached"       # the Monday after
+    done = issue(priority="Critical", expected_end_date=date(2026, 10, 16), status="Resolved", resolved_at=at(16, 20))
+    assert compute_metrics(done, [], at=at(30))["sla_state"] == "met"
+
+
+def test_priority_basis_reports_its_deadline():
+    m = compute_metrics(issue(), [], at=at(6))
+    assert m["sla_basis"] == "priority" and m["sla_target_days"] == 5
+    assert m["sla_deadline"] == at(12)                                              # Mon + 5 bd = next Mon 9:00
+
+
+def test_due_date_on_creation_day_never_divides_by_zero():
+    m = compute_metrics(issue(expected_end_date=date(2026, 10, 3)), [], at=at(6))   # a Saturday before creation
+    assert m["sla_state"] == "breached"
