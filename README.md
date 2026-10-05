@@ -107,6 +107,20 @@ cd frontend && npm run lint && npm run build && npx playwright test   # starts b
 - Test data is tagged in its titles (`[pytest]`, `[e2e]`) and removed automatically by `backend/scripts/cleanup_test_data.py`.
 - The backend scheduler is disabled during pytest (`KTASKS_DISABLE_SCHEDULER=1`).
 
+## Deployment (free tier)
+
+The frontend runs on **Vercel**, the API on **Render** (free web service), and the data stays in Supabase.
+
+1. **Render:** New → Blueprint → this repo. `render.yaml` defines the `ktasks-api` service. Enter the secret env vars (same keys as `.env`). `FRONTEND_URL` is the Vercel URL without a trailing slash.
+2. **Vercel:** import the repo with Root Directory `frontend` and set these env vars:
+   - `NEXT_PUBLIC_SUPABASE_URL`
+   - `NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY`
+   - `NEXT_PUBLIC_API_URL`: the Render URL
+3. **Supabase** → Auth → URL Configuration: set Site URL to the Vercel URL.
+4. **Keep-alive:** a free Render service sleeps after 15 min idle. An external cron (e.g. cron-job.org) hitting `GET /health` every 10 min keeps it awake, so the hourly auto-close job keeps running.
+
+Pushing to `main` redeploys both automatically. CORS allows only `FRONTEND_URL`, so Vercel preview deployments can't reach the API.
+
 ## Architecture notes
 
 - **Access:** the FastAPI backend is the only data path. RLS is enabled on every table with no policies, and the Data API roles have no privileges.

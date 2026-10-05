@@ -1,0 +1,39 @@
+# Render Blueprint for the KTasks API (free plan). Secrets are entered in the
+# Render dashboard (sync: false) and never stored in the repo.
+services:
+  - type: web
+    name: ktasks-api
+    runtime: python
+    plan: free
+    region: frankfurt
+    rootDir: backend
+    buildCommand: pip install -r requirements.txt
+    startCommand: uvicorn app.main:app --host 0.0.0.0 --port $PORT
+    healthCheckPath: /health
+    autoDeploy: true
+    envVars:
+      - key: PYTHON_VERSION
+        value: "3.12.8"
+      - key: APP_TIMEZONE
+        value: Europe/Warsaw
+      - key: STORAGE_BUCKET
+        value: issue-attachments
+      - key: SUPABASE_URL
+        sync: false
+      - key: SUPABASE_PUBLISHABLE_KEY
+        sync: false
+      - key: SUPABASE_SECRET_KEY
+        sync: false
+      - key: DATABASE_URL
+        sync: false
+      - key: RESEND_API_KEY
+        sync: false
+      - key: SENDER_EMAIL
+        sync: false
+      - key: EMAIL_OVERRIDE_TO
+        sync: false
+      # The Vercel URL, without a trailing slash (CORS origin + email links).
+      - key: FRONTEND_URL
+        sync: false
+      - key: ALLOWED_SIGNUP_DOMAINS
+        sync: false
