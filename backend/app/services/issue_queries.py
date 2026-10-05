@@ -5,14 +5,17 @@ from typing import Any
 from sqlalchemy import Connection
 
 from app.db import fetch_all
+from app.services.access import Visibility, can_lead_issue, visible_sql
 from app.services.sla import compute_metrics
 
 ISSUE_SELECT = """
-    select i.*, c.name as creator_name, l.name as lead_name,
+    select i.*, c.name as creator_name, l.name as lead_name, l.role as lead_role,
+           l.backup_lead_id as lead_backup_id, l.is_absent as lead_absent, bk.name as lead_backup_name,
            cb.name as closed_by_name, rb.name as resolved_by_name, jb.name as rejected_by_name
     from public.issues i
     join public.users c on c.id = i.creator_id
     left join public.users l on l.id = i.lead_id
+    left join public.users bk on bk.id = l.backup_lead_id
     left join public.users cb on cb.id = i.closed_by_user_id
     left join public.users rb on rb.id = i.resolved_by_user_id
     left join public.users jb on jb.id = i.rejected_by_user_id
@@ -45,7 +48,12 @@ def task_counts_by_issue(conn: Connection, ids: list[int]) -> dict[int, dict[str
     return out
 
 
-def load_issues(conn: Connection, where: str = "true", order: str = "i.created_at desc", **params: Any):
+def load_issues(conn: Connection, where: str = "true", order: str = "i.created_at desc", *,
+                viewer: dict[str, Any] | None = None, visibility: Visibility = "all", **params: Any):
+    """viewer: restrict to issues that user may see (and flag viewer_can_lead); None = internal, unrestricted."""
+    if viewer is not None:
+        where = f"({where}) and {visible_sql(viewer, 'i', visibility)}"
+        params["viewer"] = viewer["id"]
     # Soft-deleted issues are invisible everywhere in the app.
     issues = fetch_all(conn, f"{ISSUE_SELECT} where ({where}) and i.deleted_at is null order by {order}", **params)
     ids = [i["id"] for i in issues]
@@ -54,9 +62,11 @@ def load_issues(conn: Connection, where: str = "true", order: str = "i.created_a
     for issue in issues:
         issue["metrics"] = compute_metrics(issue, blockers.get(issue["id"], []), counts.get(issue["id"]))
         issue["blockers"] = blockers.get(issue["id"], [])
+        if viewer is not None:
+            issue["viewer_can_lead"] = can_lead_issue(viewer, issue)
     return issues
 
 
-def load_issue(conn: Connection, issue_id: int) -> dict[str, Any] | None:
-    rows = load_issues(conn, "i.id = :id", id=issue_id)
+def load_issue(conn: Connection, issue_id: int, viewer: dict[str, Any] | None = None) -> dict[str, Any] | None:
+    rows = load_issues(conn, "i.id = :id", viewer=viewer, id=issue_id)
     return rows[0] if rows else None

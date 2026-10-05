@@ -1,7 +1,7 @@
 "use client";
 
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { AlertTriangle, Paperclip, Plus } from "lucide-react";
+import { AlertTriangle, EyeOff, Paperclip, Plus } from "lucide-react";
 import { useRouter } from "next/navigation";
 import { useState } from "react";
 import { toast } from "sonner";
@@ -15,8 +15,10 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { useDebounced } from "@/hooks/use-debounced";
+import { useMe } from "@/hooks/use-me";
 import { api } from "@/lib/api";
 import { issueKey } from "@/lib/format";
+import { isStaff } from "@/lib/roles";
 import { AREAS, EFFORTS, PRIORITIES, type Area, type DuplicateHit, type Effort, type Issue, type Priority } from "@/lib/types";
 
 import { PriorityPill, StatusPill } from "./pills";
@@ -31,6 +33,9 @@ export function NewIssueDialog({ onCreated }: { onCreated: (issue: Issue) => voi
   const [priority, setPriority] = useState<Priority | null>(null);
   const [effort, setEffort] = useState<Effort | null>(null);
   const [files, setFiles] = useState<File[]>([]);
+  const [hidden, setHidden] = useState(false);
+  const [toBackup, setToBackup] = useState(false);
+  const { data: me } = useMe();
   const router = useRouter();
   const queryClient = useQueryClient();
   const debouncedTitle = useDebounced(title.trim(), 300);
@@ -42,7 +47,7 @@ export function NewIssueDialog({ onCreated }: { onCreated: (issue: Issue) => voi
   });
 
   function reset() {
-    setTitle(""); setSummary(""); setArea(null); setPriority(null); setEffort(null); setFiles([]);
+    setTitle(""); setSummary(""); setArea(null); setPriority(null); setEffort(null); setFiles([]); setHidden(false); setToBackup(false);
   }
 
   const create = useMutation({
@@ -53,6 +58,10 @@ export function NewIssueDialog({ onCreated }: { onCreated: (issue: Issue) => voi
       fd.set("area", area!);
       fd.set("priority", priority!);
       fd.set("effort", effort!);
+      if (hidden) {
+        fd.set("hidden", "true");
+        if (toBackup) fd.set("visible_to_backup", "true");
+      }
       files.forEach((f) => fd.append("files", f));
       return api.post<Issue>("/issues", fd);
     },
@@ -135,7 +144,7 @@ export function NewIssueDialog({ onCreated }: { onCreated: (issue: Issue) => voi
             <div className="grid grid-cols-3 gap-3">
               <div className="space-y-1.5">
                 <Label htmlFor="issue-area">Area</Label>
-                <SimpleSelect id="issue-area" aria-label="Area" value={area} options={opts(AREAS)}
+                <SimpleSelect id="issue-area" aria-label="Area" value={area} options={AREAS.map((a) => ({ value: a, label: a === "Management" ? "Management (Director)" : a }))}
                   onChange={(v) => setArea(v as Area)} />
               </div>
               <div className="space-y-1.5">
@@ -156,6 +165,22 @@ export function NewIssueDialog({ onCreated }: { onCreated: (issue: Issue) => voi
               <Input id="issue-files" type="file" multiple
                 onChange={(e) => setFiles(Array.from(e.target.files ?? []).slice(0, 5))} />
             </div>
+            {isStaff(me) && (
+              <div className="flex flex-wrap items-center gap-x-6 gap-y-2 rounded-lg border p-3 text-sm">
+                <label className="flex items-center gap-2">
+                  <input type="checkbox" className="size-4 accent-brand-navy" checked={hidden}
+                    onChange={(e) => setHidden(e.target.checked)} />
+                  <EyeOff className="size-4 text-muted-foreground" /> Hide from employees
+                </label>
+                {hidden && (
+                  <label className="flex items-center gap-2">
+                    <input type="checkbox" className="size-4 accent-brand-navy" checked={toBackup}
+                      onChange={(e) => setToBackup(e.target.checked)} />
+                    Visible to the owner&apos;s backup
+                  </label>
+                )}
+              </div>
+            )}
           </form>
           <DialogFooter>
             <Button variant="outline" onClick={() => setOpen(false)}>Cancel</Button>

@@ -8,9 +8,10 @@ from fastapi import APIRouter, BackgroundTasks, Body, File, Form, HTTPException,
 from pydantic import BaseModel, Field
 
 from app.db import execute, fetch_all, fetch_one
-from app.deps import DB, CurrentUser, LeadUser
+from app.deps import DB, CurrentUser
 from app.schemas.users import Area
 from app.services import storage
+from app.services.access import Visibility, can_lead_issue, is_staff, visible_sql
 from app.services.activity import log_activity
 from app.services.issue_queries import load_issue, load_issues
 from app.services.notifications import notify
@@ -26,17 +27,28 @@ Effort = Literal["Low", "Medium", "High"]
 MAX_FILES, MAX_FILE_BYTES = 5, 10 * 1024 * 1024
 
 
-def issue_or_404(db, issue_id: int, lock: bool = False) -> dict[str, Any]:
-    """lock=True takes a row lock so concurrent workflow changes on one issue are serialized."""
-    sql = "select * from public.issues where id = :id and deleted_at is null" + (" for update" if lock else "")
-    issue = fetch_one(db, sql, id=issue_id)
+def issue_or_404(db, issue_id: int, user: dict[str, Any], lock: bool = False) -> dict[str, Any]:
+    """The issue if `user` may see it (404 otherwise, so hidden issues don't leak).
+
+    lock=True takes a row lock so concurrent workflow changes on one issue are serialized.
+    """
+    sql = f"""select i.*, l.backup_lead_id as lead_backup_id, l.is_absent as lead_absent
+              from public.issues i left join public.users l on l.id = i.lead_id
+              where i.id = :id and i.deleted_at is null and {visible_sql(user)}""" + (
+        " for update of i" if lock else "")
+    issue = fetch_one(db, sql, id=issue_id, viewer=user["id"])
     if issue is None:
         raise HTTPException(404, "Issue not found")
     return issue
 
 
+def require_issue_lead(user: dict[str, Any], issue: dict[str, Any]) -> None:
+    if not can_lead_issue(user, issue):
+        raise HTTPException(403, "Only a Lead, a Director or the acting backup can do this")
+
+
 def can_manage(user: dict[str, Any], issue: dict[str, Any]) -> bool:
-    return user["role"] == "lead" or str(user["id"]) == str(issue["creator_id"])
+    return can_lead_issue(user, issue) or str(user["id"]) == str(issue["creator_id"])
 
 
 def add_participant(db, issue_id: int, user_id) -> None:
@@ -84,7 +96,7 @@ def store_attachments(db, issue_id: int, files: list[UploadFile], user_id) -> No
 def list_issues(
     db: DB, user: CurrentUser,
     status: str | None = None, area: Area | None = None,
-    scope: Literal["all", "mine", "assigned"] = "all",
+    scope: Literal["all", "mine", "assigned"] = "all", visibility: Visibility = "all",
 ):
     where, params = ["true"], {}
     if status == "open":
@@ -101,24 +113,24 @@ def list_issues(
     elif scope == "assigned":
         where.append("i.lead_id = :me")
         params["me"] = user["id"]
-    return load_issues(db, " and ".join(where), **params)
+    return load_issues(db, " and ".join(where), viewer=user, visibility=visibility, **params)
 
 
 @router.get("/duplicates")
-def duplicates(db: DB, _: CurrentUser, q: str = Query(max_length=200)):
+def duplicates(db: DB, user: CurrentUser, q: str = Query(max_length=200)):
     """Anti-duplicate guard: open issues whose title resembles the draft title."""
     q = q.strip()
     if len(q) < 3:
         return []
     return fetch_all(
         db,
-        """select i.id, i.title, i.status, i.area, i.priority, l.name as lead_name,
+        f"""select i.id, i.title, i.status, i.area, i.priority, l.name as lead_name,
                   round(similarity(i.title, :q)::numeric, 2) as score
            from public.issues i left join public.users l on l.id = i.lead_id
-           where i.status not in ('Closed', 'Rejected') and i.deleted_at is null
+           where i.status not in ('Closed', 'Rejected') and i.deleted_at is null and {visible_sql(user)}
              and (similarity(i.title, :q) > 0.25 or i.title ilike :p or word_similarity(:q, i.title) > 0.5)
            order by similarity(i.title, :q) desc limit 5""",
-        q=q, p=f"%{q}%",
+        q=q, p=f"%{q}%", viewer=user["id"],
     )
 
 
@@ -132,16 +144,24 @@ def create_issue(
     priority: Annotated[Priority, Form()],
     effort: Annotated[Effort, Form()],
     summary: Annotated[str, Form(max_length=5000)] = "",
+    hidden: Annotated[bool, Form()] = False,
+    visible_to_backup: Annotated[bool, Form()] = False,
     files: Annotated[list[UploadFile], File()] = [],  # noqa: B006
 ):
+    if (hidden or visible_to_backup) and not is_staff(user):
+        raise HTTPException(403, "Only Leads and Directors can hide issues")
     route = resolve_lead(db, area)
     lead_id = route["effective_lead_id"] if route else None
     row = fetch_one(
         db,
-        """insert into public.issues (title, summary, area, priority, effort, creator_id, lead_id)
-           values (:title, :summary, :area, :priority, :effort, :creator, :lead) returning id""",
+        """insert into public.issues (title, summary, area, priority, effort, creator_id, lead_id,
+                                         is_hidden, visible_to_backup, hidden_at, hidden_by_user_id)
+           values (:title, :summary, :area, :priority, :effort, :creator, :lead, :hidden, :vtb,
+                   :hidden_at, :hidden_by)
+           returning id""",
         title=title.strip(), summary=summary.strip(), area=area, priority=priority, effort=effort,
-        creator=user["id"], lead=lead_id,
+        creator=user["id"], lead=lead_id, hidden=hidden, vtb=hidden and visible_to_backup,
+        hidden_at=now() if hidden else None, hidden_by=user["id"] if hidden else None,
     )
     issue_id = row["id"]
     add_participant(db, issue_id, user["id"])
@@ -150,6 +170,10 @@ def create_issue(
     store_attachments(db, issue_id, files, user["id"])
     log_activity(db, issue_id, user["id"], "created", title=title.strip(), priority=priority, area=area,
                  lead_id=lead_id, routed_to_backup=bool(route and route["lead_absent"]))
+    if hidden:
+        log_activity(db, issue_id, user["id"], "issue_hidden")
+        if visible_to_backup:
+            log_activity(db, issue_id, user["id"], "backup_access_granted")
     if lead_id:
         via = f" (covering for {route['lead_name']})" if route["lead_absent"] else ""
         notify(
@@ -158,14 +182,14 @@ def create_issue(
             issue_id=issue_id, link=f"/issues?issue={issue_id}", exclude=None,
             email_leads=True, background=background, subject=f"[KTasks] New issue KT-{issue_id}: {title.strip()}",
         )
-    return load_issue(db, issue_id)
+    return load_issue(db, issue_id, user)
 
 
 # ---------- detail ----------
 
 @router.get("/{issue_id}")
-def get_issue(issue_id: int, db: DB, _: CurrentUser):
-    issue = load_issue(db, issue_id)
+def get_issue(issue_id: int, db: DB, user: CurrentUser):
+    issue = load_issue(db, issue_id, user)
     if issue is None:
         raise HTTPException(404, "Issue not found")
     attachments = fetch_all(
@@ -196,8 +220,8 @@ def get_issue(issue_id: int, db: DB, _: CurrentUser):
 
 
 @router.get("/{issue_id}/activity")
-def get_activity(issue_id: int, db: DB, _: CurrentUser):
-    issue_or_404(db, issue_id)
+def get_activity(issue_id: int, db: DB, user: CurrentUser):
+    issue_or_404(db, issue_id, user)
     return fetch_all(
         db,
         """select a.id, a.action_type, a.details, a.created_at, a.user_id, u.name as user_name
@@ -209,7 +233,7 @@ def get_activity(issue_id: int, db: DB, _: CurrentUser):
 
 @router.post("/{issue_id}/attachments", status_code=201)
 def add_attachments(issue_id: int, db: DB, user: CurrentUser, files: Annotated[list[UploadFile], File()]):
-    issue = issue_or_404(db, issue_id)
+    issue = issue_or_404(db, issue_id, user)
     if not can_manage(user, issue):
         raise HTTPException(403, "Only the creator or a Lead can add attachments")
     store_attachments(db, issue_id, files, user["id"])
@@ -220,7 +244,7 @@ def add_attachments(issue_id: int, db: DB, user: CurrentUser, files: Annotated[l
 @router.post("/{issue_id}/join")
 def join_thread(issue_id: int, db: DB, user: CurrentUser):
     """Anti-duplicate guard: follow an existing issue instead of filing a duplicate."""
-    issue_or_404(db, issue_id)
+    issue_or_404(db, issue_id, user)
     existing = fetch_one(db, "select 1 from public.issue_participants where issue_id = :i and user_id = :u",
                          i=issue_id, u=user["id"])
     if not existing:
@@ -240,20 +264,35 @@ class IssuePatch(BaseModel):
     expected_end_date: date | None = None
     lead_id: UUID | None = None
     status: Literal["New", "In Progress"] | None = None
+    is_hidden: bool | None = None
+    visible_to_backup: bool | None = None
+
+
+HIDE_ACTIONS = {("is_hidden", True): "issue_hidden", ("is_hidden", False): "issue_unhidden",
+                ("visible_to_backup", True): "backup_access_granted",
+                ("visible_to_backup", False): "backup_access_revoked"}
 
 
 @router.patch("/{issue_id}")
-def update_issue(issue_id: int, body: IssuePatch, db: DB, user: LeadUser, background: BackgroundTasks):
-    issue = issue_or_404(db, issue_id, lock=True)
+def update_issue(issue_id: int, body: IssuePatch, db: DB, user: CurrentUser, background: BackgroundTasks):
+    issue = issue_or_404(db, issue_id, user, lock=True)
+    require_issue_lead(user, issue)
     if issue["status"] in ("Closed", "Rejected"):
         raise HTTPException(409, f"{issue['status']} issues cannot be edited")
     changes = {k: v for k, v in body.model_dump(exclude_unset=True).items() if v != issue[k]}
+    for flag in ("is_hidden", "visible_to_backup"):
+        if flag in changes and changes[flag] is None:
+            raise HTTPException(422, f"{flag} cannot be null")
+    if changes.get("visible_to_backup") and not changes.get("is_hidden", issue["is_hidden"]):
+        raise HTTPException(422, "Only hidden issues can be opened to the backup")
     if "status" in changes and issue["status"] not in ("New", "In Progress"):
         raise HTTPException(409, "Use the resolution workflow to change status from Resolved")
     if "lead_id" in changes:
         new_lead = fetch_one(db, "select id, name, role from public.users where id = :id", id=changes["lead_id"])
-        if new_lead is None or new_lead["role"] != "lead":
-            raise HTTPException(422, "Issues can only be assigned to Leads")
+        if not is_staff(user):
+            raise HTTPException(403, "Only Leads and Directors can reassign issues")
+        if new_lead is None or not is_staff(new_lead):
+            raise HTTPException(422, "Issues can only be assigned to Leads or Directors")
     # The agreed due date (= SLA deadline) is set once; later changes go through reporter approval.
     if "expected_end_date" in changes:
         if issue["expected_end_date"] is not None:
@@ -261,9 +300,14 @@ def update_issue(issue_id: int, body: IssuePatch, db: DB, user: LeadUser, backgr
         if changes["expected_end_date"] < local_today():
             raise HTTPException(422, "The due date cannot be in the past")
     if not changes:
-        return load_issue(db, issue_id)
+        return load_issue(db, issue_id, user)
 
+    if changes.get("is_hidden") is False and issue["visible_to_backup"]:
+        changes["visible_to_backup"] = False  # unhiding also closes the backup's special access
     sets = dict(changes)
+    if "is_hidden" in changes:
+        hiding = changes["is_hidden"]
+        sets.update(hidden_at=now() if hiding else None, hidden_by_user_id=user["id"] if hiding else None)
     if changes.get("status") == "In Progress" and issue["start_date"] is None:
         sets["start_date"] = now()
     execute(db, f"update public.issues set {', '.join(f'{k} = :{k}' for k in sets)} where id = :id",
@@ -284,9 +328,11 @@ def update_issue(issue_id: int, body: IssuePatch, db: DB, user: LeadUser, backgr
                    issue_id=issue_id, link=f"/issues?issue={issue_id}", exclude=user["id"])
         elif field == "status":
             log_activity(db, issue_id, user["id"], "status_changed", **{"from": old, "to": new})
+        elif (field, new) in HIDE_ACTIONS:
+            log_activity(db, issue_id, user["id"], HIDE_ACTIONS[(field, new)])
         else:
             log_activity(db, issue_id, user["id"], "updated", field=field, **{"from": old, "to": new})
-    return load_issue(db, issue_id)
+    return load_issue(db, issue_id, user)
 
 
 class DeleteIn(BaseModel):
@@ -297,6 +343,6 @@ class DeleteIn(BaseModel):
 def delete_issue_endpoint(issue_id: int, db: DB, user: CurrentUser, background: BackgroundTasks,
                           body: Annotated[DeleteIn | None, Body()] = None):
     """Reporter or assigned Lead removes an issue (soft delete, audited)."""
-    issue = issue_or_404(db, issue_id, lock=True)
+    issue = issue_or_404(db, issue_id, user, lock=True)
     delete_issue(db, issue, user, body.reason if body else None, background)
     return {"deleted": issue_id}

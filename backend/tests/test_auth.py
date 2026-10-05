@@ -36,8 +36,8 @@ def test_area_lead_must_be_lead(client, users):
     assert r.status_code == 422
 
 
-def test_backup_must_be_lead(client, users):
-    r = client.patch(f"/users/{users[LEAD]['id']}", json={"backup_lead_id": users[EMPLOYEE]["id"]},
+def test_backup_cannot_be_self(client, users):
+    r = client.patch(f"/users/{users[LEAD]['id']}", json={"backup_lead_id": users[LEAD]["id"]},
                      headers=auth(LEAD))
     assert r.status_code == 422
 

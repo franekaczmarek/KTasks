@@ -14,6 +14,8 @@ LEAD = "anna.lead@ktasks.dev"
 LEAD2 = "marek.lead@ktasks.dev"
 EMPLOYEE = "kasia@ktasks.dev"
 EMPLOYEE2 = "piotr@ktasks.dev"
+EMPLOYEE3 = "ola@ktasks.dev"
+DIRECTOR = "director@ktasks.dev"
 
 
 @cache

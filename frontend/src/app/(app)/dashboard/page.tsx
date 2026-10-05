@@ -15,8 +15,9 @@ import {
   DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import { Skeleton } from "@/components/ui/skeleton";
+import { VisibilityFilter } from "@/components/visibility-filter";
 import { api } from "@/lib/api";
-import { AREAS, type DashboardData } from "@/lib/types";
+import { AREAS, type DashboardData, type Visibility } from "@/lib/types";
 
 const PERIODS = [
   { value: "30", label: "Last 30 days" },
@@ -36,9 +37,11 @@ const bd = (v: number | null | undefined) => (v == null ? "—" : `${v.toFixed(1
 export default function DashboardPage() {
   const [area, setArea] = useState("all");
   const [period, setPeriod] = useState("all");
+  const [visibility, setVisibility] = useState<Visibility>("all");
   const qs = new URLSearchParams({
     ...(area !== "all" && { area }),
     ...(period !== "all" && { days: period }),
+    ...(visibility !== "all" && { visibility }),
   }).toString();
 
   // Keep the previous render (dimmed) while filters refetch: no skeleton flash.
@@ -66,6 +69,7 @@ export default function DashboardPage() {
           options={[{ value: "all", label: "All areas" }, ...AREAS.map((a) => ({ value: a, label: a }))]} />
         <SimpleSelect className="w-44 bg-card" aria-label="Dashboard period" value={period} onChange={setPeriod}
           options={PERIODS} />
+        <VisibilityFilter value={visibility} onChange={setVisibility} />
         {data && <span className="text-xs text-muted-foreground">{data.scope.issue_count} issues in scope</span>}
         <div className="ml-auto">
           <DropdownMenu>

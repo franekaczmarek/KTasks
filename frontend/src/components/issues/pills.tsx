@@ -1,5 +1,5 @@
 import { cn } from "cn";
-import { Ban } from "lucide-react";
+import { Ban, EyeOff } from "lucide-react";
 
 import { fmtDateTime } from "@/lib/format";
 import type { Area, IssueStatus, Metrics, Priority, SlaState } from "@/lib/types";
@@ -37,6 +37,7 @@ const AREA: Record<Area, string> = {
   Operations: "bg-[#e6ecf5] text-brand-navy",
   Process: "bg-cyan-50 text-cyan-800",
   Improvements: "bg-lime-100 text-lime-800",
+  Management: "bg-[#f6e6ef] text-brand-plum",
 };
 
 const SLA: Record<SlaState, { label: string; cls: string }> = {
@@ -55,6 +56,15 @@ export function BlockedPill() {
   return (
     <Pill className="bg-brand-berry text-white" data-testid="blocked-badge">
       <Ban className="size-3" /> BLOCKED
+    </Pill>
+  );
+}
+
+/** Hidden from employees who are not involved in the issue. */
+export function HiddenPill({ className }: { className?: string }) {
+  return (
+    <Pill className={cn("bg-slate-800 text-white", className)} data-testid="hidden-badge" title="Hidden from employees">
+      <EyeOff className="size-3" /> Hidden
     </Pill>
   );
 }

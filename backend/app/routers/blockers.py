@@ -18,7 +18,7 @@ class BlockerIn(BaseModel):
 
 @router.post("/issues/{issue_id}/blockers", status_code=201)
 def add_blocker(issue_id: int, body: BlockerIn, db: DB, user: CurrentUser, background: BackgroundTasks):
-    issue = issue_or_404(db, issue_id)
+    issue = issue_or_404(db, issue_id, user)
     if not can_manage(user, issue):
         raise HTTPException(403, "Only the creator or a Lead can manage blockers")
     if issue["status"] in ("Resolved", "Closed", "Rejected"):
@@ -41,7 +41,7 @@ def resolve_blocker(blocker_id: int, db: DB, user: CurrentUser):
     blocker = fetch_one(db, "select * from public.blockers where id = :id", id=blocker_id)
     if blocker is None:
         raise HTTPException(404, "Blocker not found")
-    issue = issue_or_404(db, blocker["issue_id"])
+    issue = issue_or_404(db, blocker["issue_id"], user)
     if not can_manage(user, issue):
         raise HTTPException(403, "Only the creator or a Lead can manage blockers")
     if not blocker["is_active"]:

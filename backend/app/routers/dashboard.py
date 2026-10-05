@@ -4,6 +4,7 @@ from fastapi import APIRouter, Query, Response
 
 from app.deps import DB, CurrentUser
 from app.schemas.users import Area
+from app.services.access import Visibility
 from app.services.dashboard import build_dashboard
 from app.services.reports import to_pdf, to_xlsx
 from app.services.sla import now
@@ -14,16 +15,17 @@ Days = Query(None, ge=1, le=3650, description="Only issues created in the last N
 
 
 @router.get("/dashboard")
-def dashboard(db: DB, _: CurrentUser, area: Area | None = None, days: int | None = Days):
-    data = build_dashboard(db, area, days)
+def dashboard(db: DB, user: CurrentUser, area: Area | None = None, days: int | None = Days,
+              visibility: Visibility = "all"):
+    data = build_dashboard(db, area, days, viewer=user, visibility=visibility)
     data.pop("issues")
     return data
 
 
 @router.get("/reports/export")
-def export(db: DB, _: CurrentUser, format: Literal["xlsx", "pdf"] = "xlsx",  # noqa: A002
-           area: Area | None = None, days: int | None = Days):
-    data = build_dashboard(db, area, days)
+def export(db: DB, user: CurrentUser, format: Literal["xlsx", "pdf"] = "xlsx",  # noqa: A002
+           area: Area | None = None, days: int | None = Days, visibility: Visibility = "all"):
+    data = build_dashboard(db, area, days, viewer=user, visibility=visibility)
     stamp = now().strftime("%Y%m%d-%H%M")
     if format == "pdf":
         body, media = to_pdf(data), "application/pdf"

@@ -6,6 +6,7 @@ from sqlalchemy import Connection
 
 from app.config import get_settings
 from app.db import fetch_one, get_db
+from app.services.access import is_staff
 
 _jwks_client: jwt.PyJWKClient | None = None
 
@@ -59,10 +60,11 @@ def current_user(db: DB, authorization: Annotated[str | None, Header()] = None) 
 CurrentUser = Annotated[dict[str, Any], Depends(current_user)]
 
 
-def require_lead(user: CurrentUser) -> dict[str, Any]:
-    if user["role"] != "lead":
-        raise HTTPException(status.HTTP_403_FORBIDDEN, "Lead role required")
+def require_staff(user: CurrentUser) -> dict[str, Any]:
+    """Leads and Directors: administration, settings and user management."""
+    if not is_staff(user):
+        raise HTTPException(status.HTTP_403_FORBIDDEN, "Lead or Director role required")
     return user
 
 
-LeadUser = Annotated[dict[str, Any], Depends(require_lead)]
+StaffUser = Annotated[dict[str, Any], Depends(require_staff)]

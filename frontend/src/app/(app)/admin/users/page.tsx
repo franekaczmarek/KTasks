@@ -2,7 +2,7 @@
 
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { cn } from "cn";
-import { Copy, KeyRound, MoreHorizontal, Search, ShieldCheck, ShieldOff, UserCheck, UserPlus, UserX } from "lucide-react";
+import { Copy, Crown, KeyRound, MoreHorizontal, Search, ShieldCheck, ShieldOff, UserCheck, UserPlus, UserX } from "lucide-react";
 import { useState } from "react";
 import { toast } from "sonner";
 
@@ -23,6 +23,7 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 import { useMe } from "@/hooks/use-me";
 import { api } from "@/lib/api";
 import { fmtDate } from "@/lib/format";
+import { isStaff, ROLE_LABEL } from "@/lib/roles";
 import type { Role, User } from "@/lib/types";
 
 interface AdminUser extends User {
@@ -31,7 +32,17 @@ interface AdminUser extends User {
   backup_for_count: number;
 }
 
-const ROLE_OPTIONS = [{ value: "employee", label: "Employee" }, { value: "lead", label: "Lead" }];
+const ROLE_PILL: Record<Role, string> = {
+  employee: "bg-[#e6ecf5] text-brand-navy",
+  lead: "bg-[#fbe6f1] text-brand-plum",
+  director: "bg-brand-plum text-white",
+};
+const ARTICLE: Record<Role, string> = { employee: "an Employee", lead: "a Lead", director: "a Director" };
+
+const count = (users: AdminUser[], role: Role, label: string) => {
+  const n = users.filter((u) => u.role === role && u.is_active).length;
+  return `${n} ${label}${n === 1 ? "" : "s"}`;
+};
 
 function useInvalidateUsers() {
   const queryClient = useQueryClient();
@@ -48,12 +59,13 @@ export default function UserManagementPage() {
   const { data: users, isLoading } = useQuery({
     queryKey: ["admin-users"],
     queryFn: () => api.get<AdminUser[]>("/admin/users"),
-    enabled: me?.role === "lead",
+    enabled: isStaff(me),
   });
 
-  if (me && me.role !== "lead") {
-    return <PageHeader title="User management" description="Only Leads can manage user accounts." />;
+  if (me && !isStaff(me)) {
+    return <PageHeader title="User management" description="Only Leads and Directors can manage user accounts." />;
   }
+  const meIsDirector = me?.role === "director";
 
   const q = filter.trim().toLowerCase();
   const visible = (users ?? []).filter((u) => `${u.name} ${u.email}`.toLowerCase().includes(q));
@@ -63,7 +75,7 @@ export default function UserManagementPage() {
       <PageHeader
         title="User management"
         description="Create accounts, grant the Lead role, reset passwords and deactivate leavers. People can also self-register as Employees."
-        actions={<AddUserDialog onCreated={setSecret} />}
+        actions={<AddUserDialog onCreated={setSecret} canGrantDirector={meIsDirector} />}
       />
       <div className="mb-4 flex items-center gap-3">
         <div className="relative w-72">
@@ -73,7 +85,7 @@ export default function UserManagementPage() {
         </div>
         {users && (
           <span className="text-xs text-muted-foreground">
-            {users.filter((u) => u.is_active).length} active · {users.filter((u) => u.role === "lead" && u.is_active).length} Leads
+            {users.filter((u) => u.is_active).length} active · {count(users, "lead", "Lead")} · {count(users, "director", "Director")}
           </span>
         )}
       </div>
@@ -100,9 +112,7 @@ export default function UserManagementPage() {
                   </TableCell>
                   <TableCell className="text-sm text-muted-foreground">{u.email}</TableCell>
                   <TableCell>
-                    <Pill className={u.role === "lead" ? "bg-[#fbe6f1] text-brand-plum" : "bg-[#e6ecf5] text-brand-navy"}>
-                      {u.role === "lead" ? "Lead" : "Employee"}
-                    </Pill>
+                    <Pill className={ROLE_PILL[u.role]}>{ROLE_LABEL[u.role]}</Pill>
                   </TableCell>
                   <TableCell>
                     <Pill className={u.is_active ? "bg-emerald-100 text-emerald-800" : "bg-slate-200 text-slate-700"}>
@@ -111,13 +121,17 @@ export default function UserManagementPage() {
                   </TableCell>
                   <TableCell className="text-xs text-muted-foreground">
                     {[
-                      u.lead_of_areas.length ? `Lead of ${u.lead_of_areas.join(", ")}` : null,
+                      u.lead_of_areas.length ? `Owns ${u.lead_of_areas.join(", ")}` : null,
                       u.backup_for_count ? `Backup for ${u.backup_for_count}` : null,
                     ].filter(Boolean).join(" · ") || "—"}
                   </TableCell>
                   <TableCell className="text-sm">{fmtDate(u.created_at)}</TableCell>
                   <TableCell className="pr-5">
-                    <UserActions user={u} isSelf={u.id === me?.id} onPassword={setSecret} />
+                    {/* Director accounts are managed by Directors only. */}
+                    {(u.role !== "director" || meIsDirector) && (
+                      <UserActions user={u} isSelf={u.id === me?.id} canGrantDirector={meIsDirector}
+                        onPassword={setSecret} />
+                    )}
                   </TableCell>
                 </TableRow>
               ))}
@@ -130,15 +144,16 @@ export default function UserManagementPage() {
   );
 }
 
-function UserActions({ user, isSelf, onPassword }: {
-  user: AdminUser; isSelf: boolean; onPassword: (s: { email: string; password: string }) => void;
+function UserActions({ user, isSelf, canGrantDirector, onPassword }: {
+  user: AdminUser; isSelf: boolean; canGrantDirector: boolean;
+  onPassword: (s: { email: string; password: string }) => void;
 }) {
   const invalidate = useInvalidateUsers();
   const patch = useMutation({
     mutationFn: (body: Partial<{ role: Role; is_active: boolean }>) => api.patch(`/admin/users/${user.id}`, body),
     onSuccess: (_, body) => {
       invalidate();
-      toast.success(body.role ? `${user.name} is now ${body.role === "lead" ? "a Lead" : "an Employee"}`
+      toast.success(body.role ? `${user.name} is now ${ARTICLE[body.role]}`
         : body.is_active ? `${user.name} reactivated` : `${user.name} deactivated`);
     },
     onError: (e) => toast.error(e.message),
@@ -156,9 +171,17 @@ function UserActions({ user, isSelf, onPassword }: {
         <MoreHorizontal className="size-4" />
       </DropdownMenuTrigger>
       <DropdownMenuContent align="end" className="w-52">
-        {user.role === "employee" ? (
-          <DropdownMenuItem onClick={() => patch.mutate({ role: "lead" })}><ShieldCheck /> Make Lead</DropdownMenuItem>
-        ) : (
+        {user.role !== "lead" && (
+          <DropdownMenuItem disabled={isSelf} onClick={() => patch.mutate({ role: "lead" })}>
+            <ShieldCheck /> Make Lead
+          </DropdownMenuItem>
+        )}
+        {canGrantDirector && user.role !== "director" && (
+          <DropdownMenuItem disabled={isSelf} onClick={() => patch.mutate({ role: "director" })}>
+            <Crown /> Make Director
+          </DropdownMenuItem>
+        )}
+        {user.role !== "employee" && (
           <DropdownMenuItem disabled={isSelf} onClick={() => patch.mutate({ role: "employee" })}>
             <ShieldOff /> Make Employee
           </DropdownMenuItem>
@@ -177,13 +200,18 @@ function UserActions({ user, isSelf, onPassword }: {
   );
 }
 
-function AddUserDialog({ onCreated }: { onCreated: (s: { email: string; password: string }) => void }) {
+function AddUserDialog({ onCreated, canGrantDirector }: {
+  onCreated: (s: { email: string; password: string }) => void; canGrantDirector: boolean;
+}) {
   const [open, setOpen] = useState(false);
   const [name, setName] = useState("");
   const [email, setEmail] = useState("");
   const [role, setRole] = useState<Role>("employee");
   const [password, setPassword] = useState("");
   const invalidate = useInvalidateUsers();
+  // Only a Director can create Director accounts.
+  const roleOptions = (canGrantDirector ? ["employee", "lead", "director"] as const : ["employee", "lead"] as const)
+    .map((r) => ({ value: r, label: ROLE_LABEL[r] }));
 
   const create = useMutation({
     mutationFn: () => api.post<{ user: User; temporary_password: string | null }>("/admin/users", {
@@ -220,7 +248,7 @@ function AddUserDialog({ onCreated }: { onCreated: (s: { email: string; password
             </div>
             <div className="space-y-1.5">
               <Label htmlFor="new-role">Role</Label>
-              <SimpleSelect id="new-role" aria-label="Role" value={role} options={ROLE_OPTIONS}
+              <SimpleSelect id="new-role" aria-label="Role" value={role} options={roleOptions}
                 onChange={(v) => setRole(v as Role)} />
             </div>
             <div className="space-y-1.5">

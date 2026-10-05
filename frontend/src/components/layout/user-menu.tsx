@@ -10,6 +10,7 @@ import {
   DropdownMenuSeparator, DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import { useMe } from "@/hooks/use-me";
+import { isStaff } from "@/lib/roles";
 import { getSupabase } from "@/lib/supabase/client";
 
 import { ChangePasswordDialog } from "./change-password-dialog";
@@ -52,12 +53,12 @@ export function UserMenu() {
             </DropdownMenuGroup>
           )}
           <DropdownMenuSeparator />
-          {me?.role === "lead" && (
+          {isStaff(me) && (
             <DropdownMenuItem onClick={() => router.push("/settings")}>
               <Settings /> Lead settings
             </DropdownMenuItem>
           )}
-          {me?.role === "lead" && (
+          {isStaff(me) && (
             <DropdownMenuItem onClick={() => router.push("/admin/users")}>
               <Users /> User management
             </DropdownMenuItem>

@@ -16,11 +16,13 @@ USERS = [
     ("kasia@ktasks.dev", "Kasia Zielinska", "employee", None),
     ("piotr@ktasks.dev", "Piotr Lewandowski", "employee", None),
     ("ola@ktasks.dev", "Ola Kaminska", "employee", None),
+    ("director@ktasks.dev", "Dorota Wisniewska", "director", "anna.lead@ktasks.dev"),
 ]
 AREA_LEADS = {
     "Operations": "anna.lead@ktasks.dev",
     "Process": "anna.lead@ktasks.dev",
     "Improvements": "marek.lead@ktasks.dev",
+    "Management": "director@ktasks.dev",
 }
 
 

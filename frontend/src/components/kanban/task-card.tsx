@@ -2,7 +2,7 @@
 
 import { useDraggable } from "@dnd-kit/core";
 import { cn } from "cn";
-import { ArrowRightLeft, Ban, GripVertical, MoreHorizontal, Pencil, Trash2 } from "lucide-react";
+import { ArrowRightLeft, Ban, EyeOff, GripVertical, MoreHorizontal, Pencil, Trash2 } from "lucide-react";
 
 import { Pill } from "@/components/issues/pills";
 import { initials } from "@/components/layout/user-menu";
@@ -96,6 +96,7 @@ export function TaskCard({ task, showIssue, onMove, disabled, actions }: {
       </div>
       <div className="mt-2 flex items-center gap-1.5">
         {task.issue_blocked && <Pill className="bg-brand-berry px-2 text-[10px] text-white"><Ban className="size-3" />BLOCKED</Pill>}
+        {task.issue_hidden && <Pill className="bg-slate-800 px-2 text-[10px] text-white" title="Hidden from employees"><EyeOff className="size-3" />Hidden</Pill>}
         <span className="ml-auto flex items-center gap-1.5 text-[11px] text-muted-foreground">
           {task.assignee_name ?? "Unassigned"}
           <span className={cn("flex size-5 items-center justify-center rounded-full text-[9px] font-semibold text-white",

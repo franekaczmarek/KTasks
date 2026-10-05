@@ -3,14 +3,15 @@ from uuid import UUID
 
 from pydantic import BaseModel
 
-Area = Literal["Operations", "Process", "Improvements"]
+Area = Literal["Operations", "Process", "Improvements", "Management"]
+Role = Literal["employee", "lead", "director"]
 
 
 class UserOut(BaseModel):
     id: UUID
     email: str
     name: str
-    role: Literal["employee", "lead"]
+    role: Role
     backup_lead_id: UUID | None
     is_absent: bool
     is_active: bool = True

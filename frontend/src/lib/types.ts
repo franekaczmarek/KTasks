@@ -1,7 +1,9 @@
-export type Role = "employee" | "lead";
-export type Area = "Operations" | "Process" | "Improvements";
+export type Role = "employee" | "lead" | "director";
+export type Area = "Operations" | "Process" | "Improvements" | "Management";
+/** Staff-only list filter for hidden issues. */
+export type Visibility = "all" | "hidden" | "visible";
 
-export const AREAS: Area[] = ["Operations", "Process", "Improvements"];
+export const AREAS: Area[] = ["Operations", "Process", "Improvements", "Management"];
 
 export interface User {
   id: string;
@@ -23,7 +25,7 @@ export interface AreaLead {
 }
 
 export interface SearchResults {
-  issues: { id: number; title: string; status: string; area: Area }[];
+  issues: { id: number; title: string; status: string; area: Area; is_hidden: boolean }[];
   tasks: { id: number; title: string; status: string; issue_id: number; issue_title: string }[];
   discussions: { issue_id: number; issue_title: string; snippet: string }[];
 }
@@ -95,6 +97,15 @@ export interface Issue {
   rejected_at: string | null;
   rejected_by_user_id: string | null;
   rejected_by_name: string | null;
+  /** Hidden from employees who are not involved (reporter, owner, task assignees, opened-to backup). */
+  is_hidden: boolean;
+  visible_to_backup: boolean;
+  lead_role: Role | null;
+  lead_backup_id: string | null;
+  lead_backup_name: string | null;
+  lead_absent: boolean | null;
+  /** Lead-level rights for the signed-in user: staff, the owner, or the owner's backup while absent. */
+  viewer_can_lead: boolean;
   metrics: Metrics;
   blockers: Blocker[];
 }
@@ -154,6 +165,7 @@ export interface DiscussionEntry {
   status: IssueStatus;
   priority: Priority;
   area: Area;
+  is_hidden: boolean;
   last_comment: string | null;
   last_comment_by: string | null;
   last_comment_at: string | null;
@@ -195,7 +207,10 @@ export interface Task {
   issue_status: IssueStatus;
   issue_priority: Priority;
   issue_creator_id: string;
+  issue_hidden: boolean;
   issue_blocked: boolean;
+  /** Lead-level rights on the task's issue (only on GET /tasks rows). */
+  viewer_can_lead?: boolean;
 }
 
 export interface TaskTemplate {

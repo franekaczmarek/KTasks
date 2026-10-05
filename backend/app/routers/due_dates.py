@@ -7,8 +7,8 @@ from pydantic import BaseModel, Field
 from sqlalchemy import Connection
 
 from app.db import execute, fetch_one
-from app.deps import DB, CurrentUser, LeadUser
-from app.routers.issues import get_issue, issue_or_404
+from app.deps import DB, CurrentUser
+from app.routers.issues import get_issue, issue_or_404, require_issue_lead
 from app.services.activity import log_activity
 from app.services.business_days import local_today
 from app.services.notifications import notify
@@ -28,8 +28,8 @@ class DecisionIn(BaseModel):
     note: str | None = Field(None, max_length=1000)
 
 
-def _active_issue(db: Connection, issue_id: int) -> dict[str, Any]:
-    issue = issue_or_404(db, issue_id, lock=True)
+def _active_issue(db: Connection, issue_id: int, user: dict[str, Any]) -> dict[str, Any]:
+    issue = issue_or_404(db, issue_id, user, lock=True)
     if issue["status"] not in ACTIVE:
         raise HTTPException(409, f"The due date of a {issue['status']} issue can no longer change")
     return issue
@@ -41,8 +41,9 @@ def _apply(db: Connection, request_id: int, status: str, user_id, note: str | No
 
 
 @router.post("/issues/{issue_id}/due-date-requests", status_code=201)
-def request_change(issue_id: int, body: ChangeRequestIn, db: DB, user: LeadUser):
-    issue = _active_issue(db, issue_id)
+def request_change(issue_id: int, body: ChangeRequestIn, db: DB, user: CurrentUser):
+    issue = _active_issue(db, issue_id, user)
+    require_issue_lead(user, issue)
     current = issue["expected_end_date"]
     if current is None:
         raise HTTPException(409, "No due date is agreed yet: set it directly")
@@ -74,11 +75,11 @@ def request_change(issue_id: int, body: ChangeRequestIn, db: DB, user: LeadUser)
     return get_issue(issue_id, db, user)
 
 
-def _pending(db: Connection, request_id: int) -> tuple[dict[str, Any], dict[str, Any]]:
+def _pending(db: Connection, request_id: int, user: dict[str, Any]) -> tuple[dict[str, Any], dict[str, Any]]:
     req = fetch_one(db, "select * from public.due_date_requests where id = :id", id=request_id)
     if req is None:
         raise HTTPException(404, "Due date request not found")
-    issue = _active_issue(db, req["issue_id"])
+    issue = _active_issue(db, req["issue_id"], user)
     req = fetch_one(db, "select * from public.due_date_requests where id = :id for update", id=request_id)
     if req["status"] != "pending":
         raise HTTPException(409, f"This request was already {req['status']}")
@@ -86,7 +87,7 @@ def _pending(db: Connection, request_id: int) -> tuple[dict[str, Any], dict[str,
 
 
 def _decide(db: Connection, request_id: int, user: dict[str, Any], accept: bool, note: str | None):
-    req, issue = _pending(db, request_id)
+    req, issue = _pending(db, request_id, user)
     if str(issue["creator_id"]) != str(user["id"]):
         raise HTTPException(403, "Only the reporter can accept or decline a due date change")
     note = (note or "").strip() or None
@@ -115,7 +116,7 @@ def decline(request_id: int, body: DecisionIn, db: DB, user: CurrentUser):
 
 @router.post("/due-date-requests/{request_id}/withdraw")
 def withdraw(request_id: int, db: DB, user: CurrentUser):
-    req, issue = _pending(db, request_id)
+    req, issue = _pending(db, request_id, user)
     if str(req["requested_by_user_id"]) != str(user["id"]):
         raise HTTPException(403, "Only the Lead who requested the change can withdraw it")
     _apply(db, request_id, "withdrawn", user["id"], None)

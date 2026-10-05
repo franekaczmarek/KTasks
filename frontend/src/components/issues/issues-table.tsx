@@ -7,7 +7,7 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 import { issueKey } from "@/lib/format";
 import type { Issue } from "@/lib/types";
 
-import { AreaPill, BlockedPill, PriorityPill, SlaBadge, StatusPill } from "./pills";
+import { AreaPill, BlockedPill, HiddenPill, PriorityPill, SlaBadge, StatusPill } from "./pills";
 
 export function IssuesTable({ issues, onSelect }: { issues: Issue[]; onSelect: (id: number) => void }) {
   return (
@@ -45,6 +45,7 @@ export function IssuesTable({ issues, onSelect }: { issues: Issue[]; onSelect: (
                 <TableCell className="max-w-0">
                   <div className="flex items-center gap-2">
                     <span className="truncate font-medium text-foreground">{issue.title}</span>
+                    {issue.is_hidden && <HiddenPill className="shrink-0" />}
                     {red && (
                       <span className="inline-flex shrink-0 items-center gap-1 text-xs font-medium text-rose-700">
                         <Siren className="size-3.5" /> No scheduled tasks in progress

@@ -1,13 +1,13 @@
 "use client";
 
-import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { keepPreviousData, useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { cn } from "cn";
 import { LayoutGrid, ListPlus, Plus, Rows3, Siren, Wand2 } from "lucide-react";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import { useState } from "react";
 import { toast } from "sonner";
 
-import { BlockedPill, PriorityPill, StatusPill } from "@/components/issues/pills";
+import { BlockedPill, HiddenPill, PriorityPill, StatusPill } from "@/components/issues/pills";
 import { KanbanBoard, type Lane } from "@/components/kanban/board";
 import { CompletionDialog } from "@/components/kanban/completion-dialog";
 import { NewTaskDialog } from "@/components/kanban/new-task-dialog";
@@ -17,11 +17,13 @@ import { PageHeader } from "@/components/page-header";
 import { SimpleSelect } from "@/components/simple-select";
 import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
+import { VisibilityFilter } from "@/components/visibility-filter";
 import { useMe, useUsers } from "@/hooks/use-me";
 import { useMoveTask } from "@/hooks/use-move-task";
 import { api } from "@/lib/api";
 import { issueKey } from "@/lib/format";
-import type { Issue, Task, User } from "@/lib/types";
+import { isStaff } from "@/lib/roles";
+import type { Issue, Task, User, Visibility } from "@/lib/types";
 
 export function WorkView() {
   const router = useRouter();
@@ -42,10 +44,12 @@ export function WorkView() {
   };
 
   const isOpen = (t: Task) => !["Resolved", "Closed", "Rejected"].includes(t.issue_status);
-  // Lead, issue reporter or the task's assignee may move and edit; only Lead or reporter may delete.
+  // Lead-level users (staff, the owner, an acting backup), the issue reporter or the task's assignee may move and
+  // edit; only Lead-level users or the reporter may delete. Rows from a mutation lack the flag: fall back to role.
+  const leads = (t: Task) => t.viewer_can_lead ?? isStaff(me);
   const canMove = (t: Task) =>
-    !!me && isOpen(t) && (me.role === "lead" || t.assignee_id === me.id || t.issue_creator_id === me.id);
-  const canDelete = (t: Task) => !!me && isOpen(t) && (me.role === "lead" || t.issue_creator_id === me.id);
+    !!me && isOpen(t) && (leads(t) || t.assignee_id === me.id || t.issue_creator_id === me.id);
+  const canDelete = (t: Task) => !!me && isOpen(t) && (leads(t) || t.issue_creator_id === me.id);
   const actionsFor = (t: Task): TaskActions => ({
     onEdit: canMove(t) ? setEditing : undefined,
     onDelete: canDelete(t) ? setDeleting : undefined,
@@ -120,7 +124,8 @@ function FocusedBoard({ issueId, onSelectIssue, onMove, canMove, actionsFor }: {
   });
 
   const locked = ["Resolved", "Closed", "Rejected"].includes(issue?.status ?? "");
-  const canEdit = !!me && !!issue && (me.role === "lead" || me.id === issue.creator_id) && !locked;
+  const canLead = !!issue?.viewer_can_lead;
+  const canEdit = !!me && !!issue && (canLead || me.id === issue.creator_id) && !locked;
 
   return (
     <div className="space-y-4">
@@ -133,6 +138,7 @@ function FocusedBoard({ issueId, onSelectIssue, onMove, canMove, actionsFor }: {
           <div className="flex items-center gap-1.5">
             <StatusPill value={issue.status} /><PriorityPill value={issue.priority} />
             {issue.metrics.is_blocked && <BlockedPill />}
+            {issue.is_hidden && <HiddenPill />}
           </div>
         )}
         {issue?.metrics.red_alert && (
@@ -141,7 +147,7 @@ function FocusedBoard({ issueId, onSelectIssue, onMove, canMove, actionsFor }: {
           </span>
         )}
         <div className="ml-auto flex gap-2">
-          {canEdit && me?.role === "lead" && (
+          {canEdit && canLead && (
             <Button variant="outline" disabled={applyTemplates.isPending} onClick={() => applyTemplates.mutate()}>
               <Wand2 /> Apply task templates
             </Button>
@@ -175,9 +181,11 @@ function GlobalBoard({ onMove, canMove, actionsFor }: {
   actionsFor: (t: Task) => TaskActions;
 }) {
   const { data: users = [] } = useUsers();
+  const [visibility, setVisibility] = useState<Visibility>("all");
   const { data: tasks, isLoading } = useQuery({
-    queryKey: ["tasks", "all"],
-    queryFn: () => api.get<Task[]>("/tasks"),
+    queryKey: ["tasks", "all", visibility],
+    queryFn: () => api.get<Task[]>(`/tasks?visibility=${visibility}`),
+    placeholderData: keepPreviousData,
   });
   if (isLoading || !tasks) return <Skeleton className="h-96 w-full rounded-2xl" />;
 
@@ -187,5 +195,12 @@ function GlobalBoard({ onMove, canMove, actionsFor }: {
       .map((u) => ({ id: u.id, label: u.name })),
     { id: "unassigned", label: "Unassigned" },
   ];
-  return <KanbanBoard tasks={tasks} lanes={lanes} onMove={onMove} canMove={canMove} actionsFor={actionsFor} showIssue />;
+  return (
+    <div className="space-y-3">
+      <div className="flex justify-end empty:hidden">
+        <VisibilityFilter value={visibility} onChange={setVisibility} />
+      </div>
+      <KanbanBoard tasks={tasks} lanes={lanes} onMove={onMove} canMove={canMove} actionsFor={actionsFor} showIssue />
+    </div>
+  );
 }

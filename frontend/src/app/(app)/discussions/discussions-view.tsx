@@ -1,19 +1,20 @@
 "use client";
 
-import { useQuery } from "@tanstack/react-query";
+import { keepPreviousData, useQuery } from "@tanstack/react-query";
 import { cn } from "cn";
 import { MessagesSquare, Search } from "lucide-react";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import { useState } from "react";
 
-import { PriorityPill, StatusPill } from "@/components/issues/pills";
+import { HiddenPill, PriorityPill, StatusPill } from "@/components/issues/pills";
 import { ChatThread } from "@/components/discussions/chat-thread";
 import { PageHeader } from "@/components/page-header";
 import { Input } from "@/components/ui/input";
 import { Skeleton } from "@/components/ui/skeleton";
+import { VisibilityFilter } from "@/components/visibility-filter";
 import { api } from "@/lib/api";
 import { issueKey, timeAgo } from "@/lib/format";
-import type { DiscussionEntry } from "@/lib/types";
+import type { DiscussionEntry, Visibility } from "@/lib/types";
 
 export function DiscussionsView() {
   const router = useRouter();
@@ -21,11 +22,13 @@ export function DiscussionsView() {
   const selected = useSearchParams().get("issue");
   const selectedId = selected ? Number(selected) : null;
   const [filter, setFilter] = useState("");
+  const [visibility, setVisibility] = useState<Visibility>("all");
 
   const { data: threads, isLoading } = useQuery({
-    queryKey: ["discussions"],
-    queryFn: () => api.get<DiscussionEntry[]>("/discussions"),
+    queryKey: ["discussions", visibility],
+    queryFn: () => api.get<DiscussionEntry[]>(`/discussions?visibility=${visibility}`),
     refetchInterval: 15_000,
+    placeholderData: keepPreviousData,
   });
 
   const visible = (threads ?? []).filter((t) =>
@@ -38,7 +41,8 @@ export function DiscussionsView() {
       <PageHeader title="Discussions" description="Conversations on every active issue." />
       <div className="grid h-[calc(100vh-13rem)] min-h-[480px] grid-cols-[340px_1fr] overflow-hidden rounded-2xl bg-card shadow-sm">
         <aside className="flex min-h-0 flex-col border-r">
-          <div className="border-b p-3">
+          <div className="space-y-2 border-b p-3">
+            <VisibilityFilter value={visibility} onChange={setVisibility} className="w-full" />
             <div className="relative">
               <Search className="absolute left-2.5 top-2 size-4 text-muted-foreground" />
               <Input value={filter} onChange={(e) => setFilter(e.target.value)} placeholder="Filter threads…"
@@ -66,6 +70,7 @@ export function DiscussionsView() {
                   <div className="min-w-0 flex-1">
                     <div className="flex items-center gap-2">
                       <span className="font-mono text-[11px] text-muted-foreground">{issueKey(t.id)}</span>
+                      {t.is_hidden && <HiddenPill className="px-1.5 py-0 text-[10px]" />}
                       <span className="ml-auto shrink-0 text-[11px] text-muted-foreground">{timeAgo(t.last_activity_at)}</span>
                     </div>
                     <div className={cn("truncate text-sm", t.unread_count > 0 ? "font-semibold" : "font-medium")}>{t.title}</div>

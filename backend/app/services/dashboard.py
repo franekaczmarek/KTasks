@@ -16,7 +16,8 @@ EFFORTS = ["Low", "Medium", "High"]
 ROOT_CAUSES = ["Procedure", "Human Error", "IT/Equipment", "Training", "Vendor", "Other"]
 
 
-def scoped_issues(conn: Connection, area: str | None, days: int | None) -> list[dict[str, Any]]:
+def scoped_issues(conn: Connection, area: str | None, days: int | None,
+                  viewer: dict[str, Any] | None = None, visibility: str = "all") -> list[dict[str, Any]]:
     where, params = ["true"], {}
     if area:
         where.append("i.area = :area")
@@ -24,7 +25,7 @@ def scoped_issues(conn: Connection, area: str | None, days: int | None) -> list[
     if days:
         where.append("i.created_at >= :since")
         params["since"] = now() - timedelta(days=days)
-    return load_issues(conn, " and ".join(where), **params)
+    return load_issues(conn, " and ".join(where), viewer=viewer, visibility=visibility, **params)
 
 
 def _first_lead_response(conn: Connection, ids: list[int]) -> dict[int, Any]:
@@ -44,8 +45,9 @@ def _first_lead_response(conn: Connection, ids: list[int]) -> dict[int, Any]:
     return {r["id"]: r["responded_at"] for r in rows if r["responded_at"]}
 
 
-def build_dashboard(conn: Connection, area: str | None = None, days: int | None = None) -> dict[str, Any]:
-    issues = scoped_issues(conn, area, days)
+def build_dashboard(conn: Connection, area: str | None = None, days: int | None = None,
+                    viewer: dict[str, Any] | None = None, visibility: str = "all") -> dict[str, Any]:
+    issues = scoped_issues(conn, area, days, viewer, visibility)
     current = now()
     open_issues = [i for i in issues if i["status"] not in ("Closed", "Rejected")]
     finished = [i for i in issues if i["status"] in ("Resolved", "Closed")]
@@ -110,7 +112,8 @@ def build_dashboard(conn: Connection, area: str | None = None, days: int | None 
 
     blocked_issue_days = [i["metrics"]["blocker_time_days"] for i in issues if i["blockers"]]
     return {
-        "scope": {"area": area, "days": days, "issue_count": len(issues), "generated_at": current},
+        "scope": {"area": area, "days": days, "visibility": visibility, "issue_count": len(issues),
+                  "generated_at": current},
         "kpis": {
             "avg_lead_response_days": round(mean(response_days), 2) if response_days else None,
             "responded_count": len(response_days),

@@ -5,8 +5,9 @@ from fastapi import APIRouter, HTTPException
 from pydantic import BaseModel, Field
 
 from app.db import execute, fetch_all, fetch_one
-from app.deps import DB, CurrentUser, LeadUser
-from app.routers.issues import add_participant, can_manage, issue_or_404
+from app.deps import DB, CurrentUser
+from app.routers.issues import add_participant, can_manage, issue_or_404, require_issue_lead
+from app.services.access import Visibility, can_lead_issue, visible_sql
 from app.services.activity import log_activity
 from app.services.issue_queries import load_issue
 from app.services.notifications import notify
@@ -19,10 +20,12 @@ RootCause = Literal["Procedure", "Human Error", "IT/Equipment", "Training", "Ven
 
 _TASK_SELECT = """
     select t.*, a.name as assignee_name, i.title as issue_title, i.status as issue_status,
-           i.priority as issue_priority, i.creator_id as issue_creator_id,
+           i.priority as issue_priority, i.creator_id as issue_creator_id, i.is_hidden as issue_hidden,
+           i.lead_id as issue_lead_id, il.backup_lead_id as issue_lead_backup_id, il.is_absent as issue_lead_absent,
            exists(select 1 from public.blockers b where b.issue_id = i.id and b.is_active) as issue_blocked
     from public.tasks t
     join public.issues i on i.id = t.issue_id
+    left join public.users il on il.id = i.lead_id
     left join public.users a on a.id = t.assignee_id
 """
 
@@ -79,13 +82,20 @@ def load_task(db, task_id: int):
 
 
 @router.get("/tasks")
-def list_tasks(db: DB, _: CurrentUser, issue_id: int | None = None, include_closed: bool = False):
-    where = ["i.deleted_at is null"]
+def list_tasks(db: DB, user: CurrentUser, issue_id: int | None = None, include_closed: bool = False,
+               visibility: Visibility = "all"):
+    where = ["i.deleted_at is null", visible_sql(user, "i", visibility)]
     if issue_id is not None:
         where.append("t.issue_id = :issue_id")
     elif not include_closed:
         where.append("i.status not in ('Closed', 'Rejected')")
-    return fetch_all(db, f"{_TASK_SELECT} where {' and '.join(where)} order by t.position, t.id", issue_id=issue_id)
+    tasks = fetch_all(db, f"{_TASK_SELECT} where {' and '.join(where)} order by t.position, t.id",
+                      issue_id=issue_id, viewer=user["id"])
+    for t in tasks:
+        owner = {"lead_id": t["issue_lead_id"], "lead_absent": t["issue_lead_absent"],
+                 "lead_backup_id": t["issue_lead_backup_id"]}
+        t["viewer_can_lead"] = can_lead_issue(user, owner)
+    return tasks
 
 
 @router.get("/task-templates")
@@ -95,7 +105,7 @@ def task_templates(db: DB, _: CurrentUser):
 
 @router.post("/issues/{issue_id}/tasks", status_code=201)
 def create_task(issue_id: int, body: TaskIn, db: DB, user: CurrentUser):
-    issue = issue_or_404(db, issue_id, lock=True)
+    issue = issue_or_404(db, issue_id, user, lock=True)
     if not can_manage(user, issue):
         raise HTTPException(403, "Only the creator or a Lead can add tasks")
     ensure_open(issue)
@@ -116,8 +126,9 @@ def create_task(issue_id: int, body: TaskIn, db: DB, user: CurrentUser):
 
 
 @router.post("/issues/{issue_id}/tasks/from-templates", status_code=201)
-def apply_templates(issue_id: int, body: TemplatesIn, db: DB, user: LeadUser):
-    issue = issue_or_404(db, issue_id, lock=True)
+def apply_templates(issue_id: int, body: TemplatesIn, db: DB, user: CurrentUser):
+    issue = issue_or_404(db, issue_id, user, lock=True)
+    require_issue_lead(user, issue)
     ensure_open(issue)
     rows = fetch_all(
         db,
@@ -139,7 +150,7 @@ def apply_templates(issue_id: int, body: TemplatesIn, db: DB, user: LeadUser):
 def update_task(task_id: int, body: TaskPatch, db: DB, user: CurrentUser):
     """Rename / re-describe / reassign a task. Every real change is audited."""
     task = task_or_404(db, task_id)
-    issue = issue_or_404(db, task["issue_id"], lock=True)
+    issue = issue_or_404(db, task["issue_id"], user, lock=True)
     task = task_or_404(db, task_id)  # re-read under the issue lock
     if not can_work_on(user, issue, task):
         raise HTTPException(403, "Only the creator, a Lead or the assignee can edit this task")
@@ -181,7 +192,7 @@ def update_task(task_id: int, body: TaskPatch, db: DB, user: CurrentUser):
 @router.patch("/tasks/{task_id}/move")
 def move_task(task_id: int, body: TaskMove, db: DB, user: CurrentUser):
     task = task_or_404(db, task_id)
-    issue = issue_or_404(db, task["issue_id"], lock=True)
+    issue = issue_or_404(db, task["issue_id"], user, lock=True)
     task = task_or_404(db, task_id)  # re-read under the issue lock
     if not can_work_on(user, issue, task):
         raise HTTPException(403, "Only the creator, a Lead or the assignee can move this task")
@@ -204,7 +215,7 @@ def move_task(task_id: int, body: TaskMove, db: DB, user: CurrentUser):
 @router.delete("/tasks/{task_id}")
 def delete_task(task_id: int, db: DB, user: CurrentUser):
     task = task_or_404(db, task_id)
-    issue = issue_or_404(db, task["issue_id"], lock=True)
+    issue = issue_or_404(db, task["issue_id"], user, lock=True)
     if not can_manage(user, issue):
         raise HTTPException(403, "Only the creator or a Lead can delete tasks")
     ensure_open(issue)
@@ -219,10 +230,10 @@ def delete_task(task_id: int, db: DB, user: CurrentUser):
 @router.post("/issues/{issue_id}/resolve")
 def resolve(issue_id: int, body: ResolveIn, db: DB, user: CurrentUser):
     """'Are all works on this issue completed?' -> YES (requires a root cause)."""
-    issue = issue_or_404(db, issue_id, lock=True)
+    issue = issue_or_404(db, issue_id, user, lock=True)
     is_assignee = fetch_one(db, "select 1 from public.tasks where issue_id = :i and assignee_id = :u",
                             i=issue_id, u=user["id"])
-    if user["role"] != "lead" and not is_assignee:
+    if not can_lead_issue(user, issue) and not is_assignee:
         raise HTTPException(403, "Only a Lead or a task assignee can resolve the issue")
     resolve_issue(db, issue, user, body.root_cause)
-    return load_issue(db, issue_id)
+    return load_issue(db, issue_id, user)

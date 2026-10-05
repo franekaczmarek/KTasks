@@ -1,19 +1,17 @@
 """Self-registration (employees) and the Lead admin panel for user accounts."""
-from typing import Literal
 from uuid import UUID
 
 from fastapi import APIRouter, HTTPException
 from pydantic import BaseModel, EmailStr, Field
 
 from app.db import execute, fetch_all, fetch_one
-from app.deps import DB, CurrentUser, LeadUser
+from app.deps import DB, CurrentUser, StaffUser
+from app.schemas.users import Role
 from app.services.accounts import (
     check_signup_domain, create_account, generate_password, set_active, update_auth_user, verify_password,
 )
 
 router = APIRouter(tags=["accounts"])
-
-Role = Literal["employee", "lead"]
 
 _ADMIN_USER_SELECT = """
     select u.id, u.email, u.name, u.role, u.backup_lead_id, u.is_absent, u.is_active, u.created_at,
@@ -55,12 +53,14 @@ def register(body: RegisterIn, db: DB):
 
 
 @router.get("/admin/users")
-def admin_list_users(db: DB, _: LeadUser):
+def admin_list_users(db: DB, _: StaffUser):
     return fetch_all(db, f"{_ADMIN_USER_SELECT} order by u.is_active desc, u.role desc, u.name")
 
 
 @router.post("/admin/users", status_code=201)
-def admin_create_user(body: AdminCreateIn, db: DB, _: LeadUser):
+def admin_create_user(body: AdminCreateIn, db: DB, admin: StaffUser):
+    if body.role == "director":
+        _require_director(admin)
     password = body.password or generate_password()
     user = create_account(db, body.email, body.name, body.role, password)
     # The password is shown once so the Lead can hand it over; it is never stored by KTasks.
@@ -74,26 +74,38 @@ def _admin_user(db, user_id) -> dict:
     return user
 
 
-def _ensure_can_step_down(db, target: dict, action: str) -> None:
-    """A Lead who owns an area must be replaced first; backup links to them are cleared."""
-    if target["lead_of_areas"]:
-        raise HTTPException(409, f"{target['name']} is the Lead of {', '.join(target['lead_of_areas'])}. "
-                                 f"Assign another Lead to that area before you {action}.")
-    execute(db, "update public.users set backup_lead_id = null where backup_lead_id = :id", id=target["id"])
+def _require_director(admin: dict) -> None:
+    if admin["role"] != "director":
+        raise HTTPException(403, "Only a Director can grant the Director role or manage Director accounts")
+
+
+def _ensure_not_area_owner(target: dict, action: str, areas: list[str] | None = None) -> None:
+    """An area owner must be replaced in Lead settings first."""
+    owned = [a for a in target["lead_of_areas"] if areas is None or a in areas]
+    if owned:
+        raise HTTPException(409, f"{target['name']} owns {', '.join(owned)}. "
+                                 f"Assign someone else to that area before you {action}.")
 
 
 @router.patch("/admin/users/{user_id}")
-def admin_update_user(user_id: UUID, body: AdminPatchIn, db: DB, admin: LeadUser):
+def admin_update_user(user_id: UUID, body: AdminPatchIn, db: DB, admin: StaffUser):
     target = _admin_user(db, user_id)
     changes = body.model_dump(exclude_unset=True)
     is_self = str(user_id) == str(admin["id"])
-    if is_self and (changes.get("role") == "employee" or changes.get("is_active") is False):
-        raise HTTPException(409, "You cannot demote or deactivate your own account")
+    if is_self and (("role" in changes and changes["role"] != target["role"]) or changes.get("is_active") is False):
+        raise HTTPException(409, "You cannot change the role of, or deactivate, your own account")
+    if target["role"] == "director" or changes.get("role") == "director":
+        _require_director(admin)
 
-    if changes.get("role") == "employee" and target["role"] == "lead":
-        _ensure_can_step_down(db, target, "demote them")
-    if changes.get("is_active") is False and target["is_active"] and target["role"] == "lead":
-        _ensure_can_step_down(db, target, "deactivate them")
+    new_role = changes.get("role", target["role"])
+    if new_role == "employee" and target["role"] != "employee":
+        _ensure_not_area_owner(target, "demote them")
+    elif target["role"] == "director" and new_role != "director":
+        _ensure_not_area_owner(target, "change their role", ["Management"])
+    if changes.get("is_active") is False and target["is_active"]:
+        _ensure_not_area_owner(target, "deactivate them")
+        # Nobody can stand in through an inactive account.
+        execute(db, "update public.users set backup_lead_id = null where backup_lead_id = :id", id=user_id)
 
     if "name" in changes:
         execute(db, "update public.users set name = :n where id = :id", n=changes["name"].strip(), id=user_id)
@@ -105,8 +117,9 @@ def admin_update_user(user_id: UUID, body: AdminPatchIn, db: DB, admin: LeadUser
 
 
 @router.post("/admin/users/{user_id}/reset-password")
-def admin_reset_password(user_id: UUID, body: PasswordIn, db: DB, _: LeadUser):
-    _admin_user(db, user_id)
+def admin_reset_password(user_id: UUID, body: PasswordIn, db: DB, admin: StaffUser):
+    if _admin_user(db, user_id)["role"] == "director":
+        _require_director(admin)
     password = body.password or generate_password()
     update_auth_user(str(user_id), password=password)
     return {"temporary_password": None if body.password else password}

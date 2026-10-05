@@ -42,8 +42,8 @@ def scenario(client, make_issue, db, monkeypatch):
 
     ids = {a, b, c}
     real = dash.scoped_issues
-    monkeypatch.setattr(dash, "scoped_issues", lambda conn, area, days: [
-        i for i in real(conn, area, days) if i["id"] in ids])
+    monkeypatch.setattr(dash, "scoped_issues", lambda conn, area, days, *rest: [
+        i for i in real(conn, area, days, *rest) if i["id"] in ids])
     return {"a": a, "b": b, "c": c}
 
 

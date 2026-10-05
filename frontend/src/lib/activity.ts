@@ -30,6 +30,14 @@ export function describeActivity(a: ActivityEntry, users: User[] = []): string {
       return `declined the due date change to ${fmtDate(String(d.to))}${d.note ? `: "${d.note}"` : ""}`;
     case "due_date_change_withdrawn":
       return `withdrew the due date change to ${fmtDate(String(d.to))}`;
+    case "issue_hidden":
+      return "hid the issue from employees";
+    case "issue_unhidden":
+      return "made the issue visible to everyone";
+    case "backup_access_granted":
+      return "made the hidden issue visible to the owner's backup";
+    case "backup_access_revoked":
+      return "removed the backup's access to the hidden issue";
     case "updated":
       return `changed ${FIELD_LABELS[String(d.field)] ?? d.field} from ${val(d.from)} to ${val(d.to)}`;
     case "reassigned":

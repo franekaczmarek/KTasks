@@ -25,7 +25,8 @@ def _fmt(v: Any) -> Any:
 def _scope_text(d: dict[str, Any]) -> str:
     s = d["scope"]
     period = f"last {s['days']} days" if s["days"] else "all time"
-    return f"Area: {s['area'] or 'All'} · Period: {period} · Issues in scope: {s['issue_count']}"
+    vis = {"hidden": " · Hidden issues only", "visible": " · Visible issues only"}.get(s.get("visibility"), "")
+    return f"Area: {s['area'] or 'All'} · Period: {period}{vis} · Issues in scope: {s['issue_count']}"
 
 
 def kpi_rows(d: dict[str, Any]) -> list[tuple[str, Any]]:
@@ -56,12 +57,13 @@ def issue_rows(d: dict[str, Any]) -> list[list[Any]]:
         SLA_LABEL[i["metrics"]["sla_state"]], i["root_cause"] or "",
         "Yes" if i["metrics"]["is_blocked"] else "", _fmt(i["closed_at"]), i["closed_by_name"] or (
             "auto" if i["status"] == "Closed" else ""), i["rejected_reason"] or "", _fmt(i["expected_end_date"]) or "",
+        "Yes" if i.get("is_hidden") else "",
     ] for i in d["issues"]]
 
 
 ISSUE_HEADERS = ["ID", "Title", "Area", "Priority", "Effort", "Status", "Lead", "Reported by", "Created",
                  "Lead time (bd)", "Blocked (bd)", "SLA", "Root cause", "Blocked now", "Closed at", "Closed by", "Rejected reason",
-                 "Agreed due date"]
+                 "Agreed due date", "Hidden"]
 
 
 def to_xlsx(d: dict[str, Any]) -> bytes:

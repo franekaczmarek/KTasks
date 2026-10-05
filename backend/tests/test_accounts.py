@@ -90,14 +90,20 @@ def test_promote_demote_and_deactivate(client, users):
 
     r = client.patch(f"/admin/users/{uid}", json={"role": "lead", "name": "Role Changed"}, headers=auth(LEAD))
     assert r.json()["role"] == "lead" and r.json()["name"] == "Role Changed"
-    # Make them Marek's backup, then demote: the backup link is cleared automatically.
+    # Make them Marek's backup, then demote: employees may be backups, so the link stays;
+    # deactivating them clears it (nobody stands in through an inactive account).
     marek = users[LEAD2]["id"]
+
+    def marek_backup():
+        return next(u for u in client.get("/users", headers=auth(LEAD)).json() if u["id"] == marek)["backup_lead_id"]
     try:
         client.patch(f"/users/{marek}", json={"backup_lead_id": uid}, headers=auth(LEAD))
         r = client.patch(f"/admin/users/{uid}", json={"role": "employee"}, headers=auth(LEAD))
         assert r.status_code == 200 and r.json()["role"] == "employee"
-        marek_now = next(u for u in client.get("/users", headers=auth(LEAD)).json() if u["id"] == marek)
-        assert marek_now["backup_lead_id"] is None
+        assert marek_backup() == uid
+        assert client.patch(f"/admin/users/{uid}", json={"is_active": False}, headers=auth(LEAD)).status_code == 200
+        assert marek_backup() is None
+        client.patch(f"/admin/users/{uid}", json={"is_active": True}, headers=auth(LEAD))
     finally:
         client.patch(f"/users/{marek}", json={"backup_lead_id": users[LEAD]["id"]}, headers=auth(LEAD))
 

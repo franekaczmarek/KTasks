@@ -12,6 +12,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { useMe } from "@/hooks/use-me";
 import { api } from "@/lib/api";
 import { fmtDateTime } from "@/lib/format";
+import { isStaff, ROLE_LABEL } from "@/lib/roles";
 import type { Comment } from "@/lib/types";
 
 export function ChatThread({ issueId }: { issueId: number }) {
@@ -105,13 +106,13 @@ function Message({ comment, own, issueId }: { comment: Comment; own: boolean; is
   return (
     <div className={cn("group flex gap-2.5", own && "flex-row-reverse")} data-testid={`comment-${comment.id}`}>
       <div className={cn("flex size-8 shrink-0 items-center justify-center rounded-full text-[11px] font-semibold text-white",
-        comment.user_role === "lead" ? "bg-brand-berry" : "bg-brand-navy")}>
+        isStaff({ role: comment.user_role }) ? "bg-brand-berry" : "bg-brand-navy")}>
         {initials(comment.user_name)}
       </div>
       <div className={cn("max-w-[75%]", own && "items-end text-right")}>
         <div className="mb-0.5 text-xs text-muted-foreground">
           <span className="font-medium text-foreground">{comment.user_name}</span>
-          {comment.user_role === "lead" && <span className="ml-1 text-brand-berry">Lead</span>} · {fmtDateTime(comment.created_at)}
+          {isStaff({ role: comment.user_role }) && <span className="ml-1 text-brand-berry">{ROLE_LABEL[comment.user_role]}</span>} · {fmtDateTime(comment.created_at)}
           {comment.is_edited && <span className="ml-1 italic">(edited)</span>}
         </div>
         {editing ? (

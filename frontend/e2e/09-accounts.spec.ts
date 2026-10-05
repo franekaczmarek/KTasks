@@ -55,7 +55,7 @@ test("lead admin panel: create, promote, deactivate and reactivate a user", asyn
   await page.getByRole("button", { name: "User menu" }).click();
   await page.getByRole("menuitem", { name: "User management" }).click();
   await expect(page.getByRole("heading", { name: "User management" })).toBeVisible();
-  await expect(page.getByTestId(`user-row-${USERS.lead}`)).toContainText("Lead of Operations, Process");
+  await expect(page.getByTestId(`user-row-${USERS.lead}`)).toContainText("Owns Operations, Process");
 
   // Create an employee with a generated password.
   const email = uniqueEmail("admin");
@@ -97,12 +97,12 @@ test("lead admin panel: create, promote, deactivate and reactivate a user", asyn
   // Area Leads can't be demoted until replaced.
   await page.getByTestId(`user-row-${USERS.lead2}`).getByRole("button", { name: /Actions for/ }).click();
   await page.getByRole("menuitem", { name: "Make Employee" }).click();
-  await expect(page.getByText(/is the Lead of Improvements/)).toBeVisible();
+  await expect(page.getByText(/owns Improvements/)).toBeVisible();
 
   // Promoted user is offered in Lead pickers (e.g. area assignment).
   await page.goto("/settings");
   await page.getByRole("combobox", { name: "Operations lead" }).click();
-  await expect(page.getByRole("option", { name: "Tomasz Admin-Created" })).toBeVisible();
+  await expect(page.getByRole("option", { name: "Tomasz Admin-Created · Lead" })).toBeVisible();
   await page.keyboard.press("Escape");
 
   expect(errors.filter((e) => !e.includes("409"))).toEqual([]);
@@ -111,7 +111,7 @@ test("lead admin panel: create, promote, deactivate and reactivate a user", asyn
 test("employees cannot open the admin panel", async ({ page }) => {
   await login(page, USERS.employee);
   await page.goto("/admin/users");
-  await expect(page.getByText("Only Leads can manage user accounts.")).toBeVisible();
+  await expect(page.getByText("Only Leads and Directors can manage user accounts.")).toBeVisible();
   await expect(page.getByRole("button", { name: "Add user" })).toHaveCount(0);
 });
 

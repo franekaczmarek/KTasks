@@ -4,6 +4,7 @@ from pydantic import BaseModel, Field
 from app.db import execute, fetch_all, fetch_one
 from app.deps import DB, CurrentUser
 from app.routers.issues import add_participant, issue_or_404
+from app.services.access import Visibility, visible_sql
 from app.services.notifications import issue_audience, notify
 from app.services.sla import now
 
@@ -21,7 +22,7 @@ class CommentIn(BaseModel):
 
 
 @router.get("/discussions")
-def discussions(db: DB, user: CurrentUser, include_closed: bool = False):
+def discussions(db: DB, user: CurrentUser, include_closed: bool = False, visibility: Visibility = "all"):
     """Inbox: issues ordered by latest activity with last-comment preview and unread count."""
     return fetch_all(
         db,
@@ -31,7 +32,7 @@ def discussions(db: DB, user: CurrentUser, include_closed: bool = False):
             from public.comments c join public.users u on u.id = c.user_id
             order by c.issue_id, c.created_at desc
         )
-        select i.id, i.title, i.status, i.priority, i.area,
+        select i.id, i.title, i.status, i.priority, i.area, i.is_hidden,
                last.content as last_comment, last.user_name as last_comment_by,
                last.created_at as last_comment_at,
                greatest(i.updated_at, coalesce(last.created_at, i.created_at)) as last_activity_at,
@@ -43,22 +44,23 @@ def discussions(db: DB, user: CurrentUser, include_closed: bool = False):
         from public.issues i
         left join last on last.issue_id = i.id
         left join public.issue_participants p on p.issue_id = i.id and p.user_id = :me
-        where i.deleted_at is null and {"true" if include_closed else "i.status not in ('Closed', 'Rejected')"}
+        where i.deleted_at is null and {visible_sql(user, "i", visibility)}
+          and {"true" if include_closed else "i.status not in ('Closed', 'Rejected')"}
         order by last_activity_at desc
         """,
-        me=user["id"],
+        me=user["id"], viewer=user["id"],
     )
 
 
 @router.get("/issues/{issue_id}/comments")
-def list_comments(issue_id: int, db: DB, _: CurrentUser):
-    issue_or_404(db, issue_id)
+def list_comments(issue_id: int, db: DB, user: CurrentUser):
+    issue_or_404(db, issue_id, user)
     return fetch_all(db, f"{_COMMENT_SELECT} where c.issue_id = :id order by c.created_at, c.id", id=issue_id)
 
 
 @router.post("/issues/{issue_id}/comments", status_code=201)
 def add_comment(issue_id: int, body: CommentIn, db: DB, user: CurrentUser):
-    issue = issue_or_404(db, issue_id)
+    issue = issue_or_404(db, issue_id, user)
     content = body.content.strip()
     if not content:
         raise HTTPException(422, "Comment cannot be empty")
@@ -78,11 +80,12 @@ def add_comment(issue_id: int, body: CommentIn, db: DB, user: CurrentUser):
 
 @router.patch("/comments/{comment_id}")
 def edit_comment(comment_id: int, body: CommentIn, db: DB, user: CurrentUser):
-    comment = fetch_one(db, "select user_id, content from public.comments where id = :id", id=comment_id)
+    comment = fetch_one(db, "select user_id, content, issue_id from public.comments where id = :id", id=comment_id)
     if comment is None:
         raise HTTPException(404, "Comment not found")
     if str(comment["user_id"]) != str(user["id"]):
         raise HTTPException(403, "You can only edit your own comments")
+    issue_or_404(db, comment["issue_id"], user)  # e.g. the issue was hidden since
     content = body.content.strip()
     if not content:
         raise HTTPException(422, "Comment cannot be empty")
@@ -94,6 +97,6 @@ def edit_comment(comment_id: int, body: CommentIn, db: DB, user: CurrentUser):
 
 @router.post("/issues/{issue_id}/read", status_code=204)
 def mark_read(issue_id: int, db: DB, user: CurrentUser):
-    issue_or_404(db, issue_id)
+    issue_or_404(db, issue_id, user)
     execute(db, "update public.issue_participants set last_read_at = :t where issue_id = :i and user_id = :u",
             t=now(), i=issue_id, u=user["id"])

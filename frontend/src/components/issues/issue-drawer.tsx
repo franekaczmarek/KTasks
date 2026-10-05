@@ -1,7 +1,7 @@
 "use client";
 
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { Ban, CheckCircle2, Clock, FileIcon, History, Paperclip } from "lucide-react";
+import { Ban, CheckCircle2, Clock, EyeOff, FileIcon, History, Paperclip } from "lucide-react";
 import { useState } from "react";
 import { toast } from "sonner";
 
@@ -15,11 +15,12 @@ import { useMe, useUsers } from "@/hooks/use-me";
 import { describeActivity } from "@/lib/activity";
 import { api } from "@/lib/api";
 import { fmtBytes, fmtDate, fmtDateTime, fmtDays, issueKey } from "@/lib/format";
+import { isStaff } from "@/lib/roles";
 import { PRIORITIES, type ActivityEntry, type IssueDetail, type User } from "@/lib/types";
 
 import { DeleteIssueDialog } from "./delete-issue-dialog";
 import { DueDateControl, DueDateRequestBanner } from "./due-date";
-import { AreaPill, BlockedPill, PriorityPill, SlaBadge, StatusPill } from "./pills";
+import { AreaPill, BlockedPill, HiddenPill, PriorityPill, SlaBadge, StatusPill } from "./pills";
 import { RejectIssueDialog } from "./reject-dialog";
 
 export function useInvalidateIssue() {
@@ -63,6 +64,7 @@ export function IssueDrawer({ issueId, onClose, children }: {
                 <PriorityPill value={issue.priority} />
                 <AreaPill value={issue.area} />
                 {issue.metrics.is_blocked && <BlockedPill />}
+                {issue.is_hidden && <HiddenPill className="bg-white/15" />}
               </div>
             </SheetHeader>
             <div className="space-y-4 p-6">
@@ -114,10 +116,11 @@ function Stat({ label, value, hint }: { label: string; value: string; hint?: str
 function Overview({ issue, onDeleted }: { issue: IssueDetail; onDeleted: () => void }) {
   const { data: me } = useMe();
   const { data: users = [] } = useUsers();
-  const isLead = me?.role === "lead";
-  const canManage = isLead || me?.id === issue.creator_id;
+  // Lead-level rights come from the API: staff, the issue's owner, or the owner's backup while they're absent.
+  const canLead = issue.viewer_can_lead;
+  const canManage = canLead || me?.id === issue.creator_id;
   const m = issue.metrics;
-  const editable = isLead && issue.status !== "Closed" && issue.status !== "Rejected";
+  const editable = canLead && issue.status !== "Closed" && issue.status !== "Rejected";
 
   return (
     <>
@@ -145,7 +148,7 @@ function Overview({ issue, onDeleted }: { issue: IssueDetail; onDeleted: () => v
         <dl className="grid grid-cols-2 gap-x-6 gap-y-2 text-sm">
           {[
             ["Reported by", issue.creator_name],
-            ["Lead", issue.lead_name ?? "—"],
+            ["Lead", issue.lead_name ? `${issue.lead_name}${issue.lead_role === "director" ? " (Director)" : ""}` : "—"],
             ["Created", fmtDateTime(issue.created_at)],
             ["Started", fmtDateTime(issue.start_date)],
             ["Due date", issue.expected_end_date ? `${fmtDate(issue.expected_end_date)} (agreed)` : "Not agreed yet"],
@@ -183,20 +186,24 @@ function Overview({ issue, onDeleted }: { issue: IssueDetail; onDeleted: () => v
 }
 
 function LeadControls({ issue, users }: { issue: IssueDetail; users: User[] }) {
+  const { data: me } = useMe();
+  const staff = isStaff(me);
   const invalidate = useInvalidateIssue();
   const patch = useMutation({
     mutationFn: (body: Record<string, unknown>) => api.patch(`/issues/${issue.id}`, body),
     onSuccess: () => { invalidate(issue.id); toast.success("Issue updated"); },
     onError: (e) => toast.error(e.message),
   });
-  const leads = users.filter((u) => u.role === "lead" && u.is_active).map((u) => ({ value: u.id, label: u.name }));
+  // Issues are owned by staff; an employee backup can own one only through routing (kept so the select shows it).
+  const leads = users.filter((u) => (isStaff(u) && u.is_active) || u.id === issue.lead_id)
+    .map((u) => ({ value: u.id, label: u.role === "director" ? `${u.name} (Director)` : u.name }));
   const rejectable = issue.status === "New" || issue.status === "In Progress";
   const statusOptions = issue.status === "New" || issue.status === "In Progress"
     ? [{ value: "New", label: "New" }, { value: "In Progress", label: "In Progress" }]
     : [{ value: issue.status, label: issue.status }];
 
   return (
-    <Section title="Lead controls"
+    <Section title={staff ? "Lead controls" : "Lead controls (acting as backup)"}
       action={rejectable && <RejectIssueDialog issueId={issue.id} onRejected={() => invalidate(issue.id)} />}>
       <div className="grid grid-cols-2 gap-3 rounded-xl border p-3 text-sm sm:grid-cols-4">
         <label className="space-y-1">
@@ -211,7 +218,7 @@ function LeadControls({ issue, users }: { issue: IssueDetail; users: User[] }) {
         </label>
         <label className="space-y-1">
           <span className="text-xs text-muted-foreground">Lead</span>
-          <SimpleSelect aria-label="Reassign lead" value={issue.lead_id} options={leads}
+          <SimpleSelect aria-label="Reassign lead" value={issue.lead_id} options={leads} disabled={!staff}
             onChange={(lead_id) => patch.mutate({ lead_id })} />
         </label>
         {/* Not a <label>: it holds buttons, which a wrapping label would rename. */}
@@ -219,6 +226,30 @@ function LeadControls({ issue, users }: { issue: IssueDetail; users: User[] }) {
           <span className="text-xs text-muted-foreground">Due date (SLA)</span>
           <DueDateControl issue={issue} onSet={(expected_end_date) => patch.mutate({ expected_end_date })} />
         </div>
+      </div>
+      <div className="mt-2 flex flex-wrap items-center gap-x-6 gap-y-2 rounded-xl border p-3 text-sm"
+        data-testid="visibility-controls">
+        <label className="flex items-center gap-2">
+          <input type="checkbox" className="size-4 accent-brand-navy" checked={issue.is_hidden}
+            disabled={patch.isPending} onChange={(e) => patch.mutate({ is_hidden: e.target.checked })} />
+          <EyeOff className="size-4 text-muted-foreground" /> Hide from employees
+        </label>
+        {issue.is_hidden && (
+          <label className="flex items-center gap-2">
+            <input type="checkbox" className="size-4 accent-brand-navy" checked={issue.visible_to_backup}
+              disabled={patch.isPending || !issue.lead_backup_id}
+              onChange={(e) => patch.mutate({ visible_to_backup: e.target.checked })} />
+            Visible to backup
+            <span className="text-xs text-muted-foreground">
+              {issue.lead_backup_name ? `(${issue.lead_backup_name})` : "(the owner has no backup)"}
+            </span>
+          </label>
+        )}
+        <span className="basis-full text-xs text-muted-foreground">
+          {issue.is_hidden
+            ? "Only Leads, Directors, the reporter, the owner and task assignees can see this issue."
+            : "Visible to everyone."}
+        </span>
       </div>
     </Section>
   );

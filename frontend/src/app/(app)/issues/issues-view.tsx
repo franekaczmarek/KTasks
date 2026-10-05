@@ -11,8 +11,9 @@ import { ResolutionPanel } from "@/components/issues/resolution-panel";
 import { PageHeader } from "@/components/page-header";
 import { SimpleSelect } from "@/components/simple-select";
 import { Skeleton } from "@/components/ui/skeleton";
+import { VisibilityFilter } from "@/components/visibility-filter";
 import { api } from "@/lib/api";
-import { AREAS, type Issue } from "@/lib/types";
+import { AREAS, type Issue, type Visibility } from "@/lib/types";
 
 const SCOPES = [
   { value: "all", label: "All issues" },
@@ -37,11 +38,13 @@ export function IssuesView() {
   const [scope, setScope] = useState("all");
   const [status, setStatus] = useState("open");
   const [area, setArea] = useState("all");
+  const [visibility, setVisibility] = useState<Visibility>("all");
 
   const qs = new URLSearchParams({
     scope,
     ...(status !== "any" && { status }),
     ...(area !== "all" && { area }),
+    ...(visibility !== "all" && { visibility }),
   }).toString();
   const { data: issues, isLoading } = useQuery({
     queryKey: ["issues", qs],
@@ -65,6 +68,7 @@ export function IssuesView() {
         <SimpleSelect className="w-44 bg-card" aria-label="Area filter" value={area}
           options={[{ value: "all", label: "All areas" }, ...AREAS.map((a) => ({ value: a, label: a }))]}
           onChange={setArea} />
+        <VisibilityFilter value={visibility} onChange={setVisibility} />
       </div>
       {isLoading || !issues ? (
         <Skeleton className="h-64 w-full rounded-2xl" />
