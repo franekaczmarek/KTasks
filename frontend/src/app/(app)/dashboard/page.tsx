@@ -28,7 +28,7 @@ const PERIODS = [
 
 function slaSubtitle({ agreed_count, pending_requests }: DashboardData["sla_status"]) {
   const pending = pending_requests
-    ? ` · ${pending_requests} due date change${pending_requests === 1 ? "" : "s"} awaiting the reporter` : "";
+    ? ` · ${pending_requests} due date request${pending_requests === 1 ? "" : "s"} awaiting a decision` : "";
   return `Issues in each SLA phase · ${agreed_count} active on an agreed due date${pending}`;
 }
 

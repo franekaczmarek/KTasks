@@ -25,6 +25,7 @@ router = APIRouter(prefix="/issues", tags=["issues"])
 Priority = Literal["Low", "Medium", "High", "Critical"]
 Effort = Literal["Low", "Medium", "High"]
 MAX_FILES, MAX_FILE_BYTES = 5, 10 * 1024 * 1024
+MIN_REASON = 5  # due date reasons and comments
 
 
 def issue_or_404(db, issue_id: int, user: dict[str, Any], lock: bool = False) -> dict[str, Any]:
@@ -146,10 +147,18 @@ def create_issue(
     summary: Annotated[str, Form(max_length=5000)] = "",
     hidden: Annotated[bool, Form()] = False,
     visible_to_backup: Annotated[bool, Form()] = False,
+    due_date: Annotated[date | None, Form()] = None,
+    due_date_reason: Annotated[str, Form(max_length=1000)] = "",
     files: Annotated[list[UploadFile], File()] = [],  # noqa: B006
 ):
     if (hidden or visible_to_backup) and not is_staff(user):
         raise HTTPException(403, "Only Leads and Directors can hide issues")
+    due_date_reason = due_date_reason.strip()
+    if due_date is not None:
+        if due_date < local_today():
+            raise HTTPException(422, "The proposed due date cannot be in the past")
+        if len(due_date_reason) < MIN_REASON:
+            raise HTTPException(422, f"Explain the proposed due date (at least {MIN_REASON} characters)")
     route = resolve_lead(db, area)
     lead_id = route["effective_lead_id"] if route else None
     row = fetch_one(
@@ -174,11 +183,23 @@ def create_issue(
         log_activity(db, issue_id, user["id"], "issue_hidden")
         if visible_to_backup:
             log_activity(db, issue_id, user["id"], "backup_access_granted")
+    proposed = ""
+    if due_date is not None:
+        log_activity(db, issue_id, user["id"], "due_date_proposed", date=due_date, reason=due_date_reason)
+        if str(lead_id) == str(user["id"]):
+            # The reporter is the routed owner: no one else has to agree, so the date applies at once.
+            execute(db, "update public.issues set expected_end_date = :d where id = :id", d=due_date, id=issue_id)
+            log_activity(db, issue_id, user["id"], "due_date_proposal_accepted", date=due_date, self_approved=True)
+        else:
+            execute(db, """insert into public.due_date_requests (issue_id, requested_by_user_id, kind, to_date, reason)
+                           values (:i, :u, 'proposal', :t, :r)""",
+                    i=issue_id, u=user["id"], t=due_date, r=due_date_reason)
+            proposed = f" (proposed due date {due_date:%d.%m.%Y})"
     if lead_id:
         via = f" (covering for {route['lead_name']})" if route["lead_absent"] else ""
         notify(
             db, [lead_id], "issue_assigned",
-            f"New {priority} issue KT-{issue_id} in {area}: {title.strip()}{via}",
+            f"New {priority} issue KT-{issue_id} in {area}: {title.strip()}{via}{proposed}",
             issue_id=issue_id, link=f"/issues?issue={issue_id}", exclude=None,
             email_leads=True, background=background, subject=f"[KTasks] New issue KT-{issue_id}: {title.strip()}",
         )
@@ -204,14 +225,21 @@ def get_issue(issue_id: int, db: DB, user: CurrentUser):
         a["url"] = urls.get(a.pop("storage_path"))
     issue["attachments"] = attachments
     requests = fetch_all(
-        db, """select r.id, r.from_date, r.to_date, r.reason, r.status, r.decision_note, r.created_at, r.decided_at,
-                      r.requested_by_user_id, u.name as requested_by_name, d.name as decided_by_name
+        db, """select r.id, r.kind, r.from_date, r.to_date, r.reason, r.status, r.decision_note, r.created_at,
+                      r.decided_at, r.requested_by_user_id, u.name as requested_by_name, d.name as decided_by_name
                from public.due_date_requests r join public.users u on u.id = r.requested_by_user_id
                left join public.users d on d.id = r.decided_by_user_id
                where r.issue_id = :id order by r.created_at desc limit 10""", id=issue_id,
     )
     issue["pending_due_date_request"] = next((r for r in requests if r["status"] == "pending"), None)
     issue["due_date_history"] = [r for r in requests if r["status"] != "pending"]
+    # Every due date event with its reason or comment, oldest first (the hover history in the drawer).
+    issue["due_date_events"] = fetch_all(
+        db, """select a.id, a.action_type, a.details, a.created_at, a.user_id, u.name as user_name
+               from public.activity_log a left join public.users u on u.id = a.user_id
+               where a.issue_id = :id and a.action_type like 'due_date%' order by a.created_at, a.id""",
+        id=issue_id,
+    )
     issue["participants"] = fetch_all(
         db, "select u.id, u.name, u.role from public.issue_participants p join public.users u on u.id = p.user_id "
             "where p.issue_id = :id order by p.joined_at", id=issue_id,
@@ -266,6 +294,7 @@ class IssuePatch(BaseModel):
     status: Literal["New", "In Progress"] | None = None
     is_hidden: bool | None = None
     visible_to_backup: bool | None = None
+    due_date_reason: str | None = Field(None, max_length=1000)  # optional comment when setting the due date
 
 
 HIDE_ACTIONS = {("is_hidden", True): "issue_hidden", ("is_hidden", False): "issue_unhidden",
@@ -279,7 +308,9 @@ def update_issue(issue_id: int, body: IssuePatch, db: DB, user: CurrentUser, bac
     require_issue_lead(user, issue)
     if issue["status"] in ("Closed", "Rejected"):
         raise HTTPException(409, f"{issue['status']} issues cannot be edited")
-    changes = {k: v for k, v in body.model_dump(exclude_unset=True).items() if v != issue[k]}
+    fields = body.model_dump(exclude_unset=True)
+    due_date_reason = (fields.pop("due_date_reason", None) or "").strip() or None
+    changes = {k: v for k, v in fields.items() if v != issue[k]}
     for flag in ("is_hidden", "visible_to_backup"):
         if flag in changes and changes[flag] is None:
             raise HTTPException(422, f"{flag} cannot be null")
@@ -297,8 +328,13 @@ def update_issue(issue_id: int, body: IssuePatch, db: DB, user: CurrentUser, bac
     if "expected_end_date" in changes:
         if issue["expected_end_date"] is not None:
             raise HTTPException(409, "The due date is already agreed: request a change for the reporter to approve")
+        if changes["expected_end_date"] is None:
+            raise HTTPException(422, "expected_end_date cannot be null")
         if changes["expected_end_date"] < local_today():
             raise HTTPException(422, "The due date cannot be in the past")
+        if fetch_one(db, "select 1 from public.due_date_requests where issue_id = :i and status = 'pending' "
+                         "and kind = 'proposal'", i=issue_id):
+            raise HTTPException(409, "The reporter proposed a due date: accept it or set a different one with a comment")
     if not changes:
         return load_issue(db, issue_id, user)
 
@@ -322,7 +358,8 @@ def update_issue(issue_id: int, body: IssuePatch, db: DB, user: CurrentUser, bac
                    issue_id=issue_id, link=f"/issues?issue={issue_id}", exclude=user["id"],
                    email_leads=True, background=background, subject=f"[KTasks] KT-{issue_id} reassigned to you")
         elif field == "expected_end_date":
-            log_activity(db, issue_id, user["id"], "due_date_set", date=new)
+            log_activity(db, issue_id, user["id"], "due_date_set", date=new,
+                         **({"reason": due_date_reason} if due_date_reason else {}))
             notify(db, [issue["creator_id"]], "due_date_set",
                    f"{user['name']} set the due date of KT-{issue_id} to {new:%d.%m.%Y}: {issue['title']}",
                    issue_id=issue_id, link=f"/issues?issue={issue_id}", exclude=user["id"])

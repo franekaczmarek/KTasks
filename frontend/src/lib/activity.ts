@@ -19,7 +19,17 @@ export function describeActivity(a: ActivityEntry, users: User[] = []): string {
     case "date_changed":
       return `changed expected end date from ${val(d.from)} to ${val(d.to)}`;
     case "due_date_set":
-      return `set the due date to ${fmtDate(String(d.date))}`;
+      return `set the due date to ${fmtDate(String(d.date))}${d.reason ? `: "${d.reason}"` : ""}`;
+    case "due_date_proposed":
+      return `proposed the due date ${fmtDate(String(d.date))}: "${d.reason}"`;
+    case "due_date_proposal_accepted":
+      return d.self_approved
+        ? `set the due date to ${fmtDate(String(d.date))} (own issue, self-approved)`
+        : `accepted the proposed due date ${fmtDate(String(d.date))}`;
+    case "due_date_proposal_overridden":
+      return `set the due date to ${fmtDate(String(d.to))} instead of the proposed ${fmtDate(String(d.proposed))}: "${d.reason}"`;
+    case "due_date_proposal_withdrawn":
+      return `withdrew the proposed due date ${fmtDate(String(d.to))}`;
     case "due_date_change_requested":
       return `asked to move the due date from ${fmtDate(String(d.from))} to ${fmtDate(String(d.to))}: "${d.reason}"`;
     case "due_date_change_accepted":

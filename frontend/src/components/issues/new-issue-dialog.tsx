@@ -1,7 +1,7 @@
 "use client";
 
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { AlertTriangle, EyeOff, Paperclip, Plus } from "lucide-react";
+import { AlertTriangle, CalendarClock, EyeOff, Paperclip, Plus } from "lucide-react";
 import { useRouter } from "next/navigation";
 import { useState } from "react";
 import { toast } from "sonner";
@@ -24,6 +24,8 @@ import { AREAS, EFFORTS, PRIORITIES, type Area, type DuplicateHit, type Effort, 
 import { PriorityPill, StatusPill } from "./pills";
 
 const opts = (xs: readonly string[]) => xs.map((x) => ({ value: x, label: x }));
+const MIN_REASON = 5;
+const today = () => new Date().toLocaleDateString("en-CA"); // yyyy-mm-dd in local time
 
 export function NewIssueDialog({ onCreated }: { onCreated: (issue: Issue) => void }) {
   const [open, setOpen] = useState(false);
@@ -35,6 +37,8 @@ export function NewIssueDialog({ onCreated }: { onCreated: (issue: Issue) => voi
   const [files, setFiles] = useState<File[]>([]);
   const [hidden, setHidden] = useState(false);
   const [toBackup, setToBackup] = useState(false);
+  const [dueDate, setDueDate] = useState("");
+  const [dueReason, setDueReason] = useState("");
   const { data: me } = useMe();
   const router = useRouter();
   const queryClient = useQueryClient();
@@ -48,6 +52,7 @@ export function NewIssueDialog({ onCreated }: { onCreated: (issue: Issue) => voi
 
   function reset() {
     setTitle(""); setSummary(""); setArea(null); setPriority(null); setEffort(null); setFiles([]); setHidden(false); setToBackup(false);
+    setDueDate(""); setDueReason("");
   }
 
   const create = useMutation({
@@ -61,6 +66,10 @@ export function NewIssueDialog({ onCreated }: { onCreated: (issue: Issue) => voi
       if (hidden) {
         fd.set("hidden", "true");
         if (toBackup) fd.set("visible_to_backup", "true");
+      }
+      if (dueDate) {
+        fd.set("due_date", dueDate);
+        fd.set("due_date_reason", dueReason.trim());
       }
       files.forEach((f) => fd.append("files", f));
       return api.post<Issue>("/issues", fd);
@@ -86,7 +95,8 @@ export function NewIssueDialog({ onCreated }: { onCreated: (issue: Issue) => voi
     onError: (e) => toast.error(e.message),
   });
 
-  const valid = title.trim().length >= 3 && area && priority && effort;
+  const dueDateValid = !dueDate || (dueDate >= today() && dueReason.trim().length >= MIN_REASON);
+  const valid = title.trim().length >= 3 && area && priority && effort && dueDateValid;
   const showDupes = debouncedTitle.length >= 3 && duplicates.length > 0;
 
   return (
@@ -157,6 +167,31 @@ export function NewIssueDialog({ onCreated }: { onCreated: (issue: Issue) => voi
                 <SimpleSelect id="issue-effort" aria-label="Estimated effort" value={effort} options={opts(EFFORTS)}
                   onChange={(v) => setEffort(v as Effort)} />
               </div>
+            </div>
+            <div className="space-y-2 rounded-lg border p-3" data-testid="due-date-proposal">
+              <div className="flex flex-wrap items-end gap-3">
+                <div className="space-y-1.5">
+                  <Label htmlFor="issue-due-date" className="flex items-center gap-1.5">
+                    <CalendarClock className="size-3.5" /> Proposed due date (optional)
+                  </Label>
+                  <Input id="issue-due-date" type="date" className="w-44" min={today()} value={dueDate}
+                    onChange={(e) => setDueDate(e.target.value)} />
+                </div>
+                <p className="flex-1 pb-1.5 text-xs text-muted-foreground">
+                  The Lead accepts it or sets another date. Until then the SLA follows the priority.
+                </p>
+              </div>
+              {dueDate && (
+                <div className="space-y-1.5">
+                  <Label htmlFor="issue-due-reason">Why this date? (required)</Label>
+                  <Textarea id="issue-due-reason" rows={2} maxLength={1000} value={dueReason}
+                    onChange={(e) => setDueReason(e.target.value)}
+                    placeholder="e.g. The batch release is planned for that week" />
+                  {dueReason.length > 0 && dueReason.trim().length < MIN_REASON && (
+                    <p className="text-xs text-destructive">Please give at least {MIN_REASON} characters.</p>
+                  )}
+                </div>
+              )}
             </div>
             <div className="space-y-1.5">
               <Label htmlFor="issue-files" className="flex items-center gap-1.5">

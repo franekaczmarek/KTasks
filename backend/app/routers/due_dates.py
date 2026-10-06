@@ -1,4 +1,8 @@
-"""Agreed due date changes: the Lead proposes, the reporter accepts or declines."""
+"""Agreed due date requests.
+
+kind 'proposal': the reporter proposed a date at creation; a Lead accepts it or sets another one (with a comment).
+kind 'change'  : a Lead moves the agreed date; the reporter accepts or declines.
+"""
 from datetime import date
 from typing import Any
 
@@ -52,7 +56,7 @@ def request_change(issue_id: int, body: ChangeRequestIn, db: DB, user: CurrentUs
     if body.to_date < local_today():
         raise HTTPException(422, "The due date cannot be in the past")
     if fetch_one(db, "select 1 from public.due_date_requests where issue_id = :i and status = 'pending'", i=issue_id):
-        raise HTTPException(409, "A due date change is already waiting for the reporter")
+        raise HTTPException(409, "A due date request is already waiting for a decision")
     reason = body.reason.strip()
     row = fetch_one(
         db, """insert into public.due_date_requests (issue_id, requested_by_user_id, from_date, to_date, reason)
@@ -86,8 +90,31 @@ def _pending(db: Connection, request_id: int, user: dict[str, Any]) -> tuple[dic
     return req, issue
 
 
+def _require_proposal_decider(user: dict[str, Any], req: dict[str, Any], issue: dict[str, Any]) -> None:
+    require_issue_lead(user, issue)
+    if str(req["requested_by_user_id"]) == str(user["id"]):
+        raise HTTPException(403, "Your own proposal is decided by the issue's Lead")
+
+
+def _accept_proposal(db: Connection, req: dict[str, Any], issue: dict[str, Any], user: dict[str, Any]):
+    _require_proposal_decider(user, req, issue)
+    if req["to_date"] < local_today():
+        raise HTTPException(409, "The proposed date has passed: set a different one")
+    _apply(db, req["id"], "accepted", user["id"], None)
+    execute(db, "update public.issues set expected_end_date = :d where id = :id", d=req["to_date"], id=issue["id"])
+    log_activity(db, issue["id"], user["id"], "due_date_proposal_accepted", date=req["to_date"])
+    notify(db, [req["requested_by_user_id"]], "due_date_set",
+           f"{user['name']} accepted your proposed due date {req['to_date']:%d.%m.%Y} for KT-{issue['id']}",
+           issue_id=issue["id"], link=f"/issues?issue={issue['id']}", exclude=user["id"])
+    return get_issue(issue["id"], db, user)
+
+
 def _decide(db: Connection, request_id: int, user: dict[str, Any], accept: bool, note: str | None):
     req, issue = _pending(db, request_id, user)
+    if req["kind"] == "proposal":
+        if not accept:
+            raise HTTPException(409, "Set a different due date with a comment instead of declining the proposal")
+        return _accept_proposal(db, req, issue, user)
     if str(issue["creator_id"]) != str(user["id"]):
         raise HTTPException(403, "Only the reporter can accept or decline a due date change")
     note = (note or "").strip() or None
@@ -114,11 +141,35 @@ def decline(request_id: int, body: DecisionIn, db: DB, user: CurrentUser):
     return _decide(db, request_id, user, False, body.note)
 
 
+@router.post("/due-date-requests/{request_id}/counter")
+def counter(request_id: int, body: ChangeRequestIn, db: DB, user: CurrentUser):
+    """A Lead sets a different date than the reporter proposed: it applies at once, the comment is required."""
+    req, issue = _pending(db, request_id, user)
+    if req["kind"] != "proposal":
+        raise HTTPException(409, "Only a proposed due date can be answered with a different date")
+    _require_proposal_decider(user, req, issue)
+    if body.to_date == req["to_date"]:
+        raise HTTPException(422, "This is the proposed date: accept it instead")
+    if body.to_date < local_today():
+        raise HTTPException(422, "The due date cannot be in the past")
+    reason = body.reason.strip()
+    _apply(db, request_id, "declined", user["id"], reason)
+    execute(db, "update public.issues set expected_end_date = :d where id = :id", d=body.to_date, id=issue["id"])
+    log_activity(db, issue["id"], user["id"], "due_date_proposal_overridden",
+                 proposed=req["to_date"], to=body.to_date, reason=reason)
+    notify(db, [req["requested_by_user_id"]], "due_date_set",
+           f"{user['name']} set the due date of KT-{issue['id']} to {body.to_date:%d.%m.%Y} instead of your "
+           f"proposed {req['to_date']:%d.%m.%Y}: {reason}",
+           issue_id=issue["id"], link=f"/issues?issue={issue['id']}", exclude=user["id"])
+    return get_issue(issue["id"], db, user)
+
+
 @router.post("/due-date-requests/{request_id}/withdraw")
 def withdraw(request_id: int, db: DB, user: CurrentUser):
     req, issue = _pending(db, request_id, user)
     if str(req["requested_by_user_id"]) != str(user["id"]):
-        raise HTTPException(403, "Only the Lead who requested the change can withdraw it")
+        raise HTTPException(403, "Only the person who made the request can withdraw it")
     _apply(db, request_id, "withdrawn", user["id"], None)
-    log_activity(db, issue["id"], user["id"], "due_date_change_withdrawn", to=req["to_date"])
+    action = "due_date_proposal_withdrawn" if req["kind"] == "proposal" else "due_date_change_withdrawn"
+    log_activity(db, issue["id"], user["id"], action, to=req["to_date"])
     return get_issue(issue["id"], db, user)

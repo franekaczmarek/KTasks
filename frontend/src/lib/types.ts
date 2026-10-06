@@ -121,7 +121,9 @@ export interface Attachment {
 
 export interface DueDateRequest {
   id: number;
-  from_date: string;
+  /** proposal: the reporter's date at creation, decided by a Lead; change: a Lead's move, decided by the reporter. */
+  kind: "proposal" | "change";
+  from_date: string | null;
   to_date: string;
   reason: string;
   status: "pending" | "accepted" | "declined" | "withdrawn";
@@ -137,6 +139,8 @@ export interface IssueDetail extends Issue {
   attachments: Attachment[];
   pending_due_date_request: DueDateRequest | null;
   due_date_history: DueDateRequest[];
+  /** Every due date event (activity log), oldest first. */
+  due_date_events: ActivityEntry[];
   participants: { id: string; name: string; role: Role }[];
 }
 

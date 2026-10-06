@@ -34,7 +34,7 @@ export async function choose(page: Page, label: string, option: string) {
 export async function createIssue(
   page: Page,
   title: string,
-  { area = "Operations", priority = "Medium", effort = "Low", summary = "" } = {},
+  { area = "Operations", priority = "Medium", effort = "Low", summary = "", dueDate = "", dueReason = "" } = {},
 ): Promise<number> {
   await page.goto("/issues");
   await page.getByRole("button", { name: "Report issue" }).click();
@@ -44,6 +44,10 @@ export async function createIssue(
   await choose(page, "Area", area);
   await choose(page, "Priority", priority);
   await choose(page, "Estimated effort", effort);
+  if (dueDate) {
+    await dialog.getByLabel(/Proposed due date/).fill(dueDate);
+    await dialog.getByLabel(/Why this date/).fill(dueReason);
+  }
   await dialog.getByRole("button", { name: "Submit issue" }).click();
   await expect(page).toHaveURL(/\?issue=\d+/);
   return Number(new URL(page.url()).searchParams.get("issue"));

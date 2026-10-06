@@ -2,7 +2,7 @@
 
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { Ban, CheckCircle2, Clock, EyeOff, FileIcon, History, Paperclip } from "lucide-react";
-import { useState } from "react";
+import { useState, type ReactNode } from "react";
 import { toast } from "sonner";
 
 import { SimpleSelect } from "@/components/simple-select";
@@ -19,7 +19,7 @@ import { isStaff } from "@/lib/roles";
 import { PRIORITIES, type ActivityEntry, type IssueDetail, type User } from "@/lib/types";
 
 import { DeleteIssueDialog } from "./delete-issue-dialog";
-import { DueDateControl, DueDateRequestBanner } from "./due-date";
+import { DueDateControl, DueDateHistory, DueDateRequestBanner } from "./due-date";
 import { AreaPill, BlockedPill, HiddenPill, PriorityPill, SlaBadge, StatusPill } from "./pills";
 import { RejectIssueDialog } from "./reject-dialog";
 
@@ -121,6 +121,13 @@ function Overview({ issue, onDeleted }: { issue: IssueDetail; onDeleted: () => v
   const canManage = canLead || me?.id === issue.creator_id;
   const m = issue.metrics;
   const editable = canLead && issue.status !== "Closed" && issue.status !== "Rejected";
+  const proposal = issue.pending_due_date_request?.kind === "proposal" ? issue.pending_due_date_request : null;
+  const dueDate = (
+    <DueDateHistory issue={issue}>
+      {issue.expected_end_date ? `${fmtDate(issue.expected_end_date)} (agreed)`
+        : proposal ? `${fmtDate(proposal.to_date)} (proposed)` : "Not agreed yet"}
+    </DueDateHistory>
+  );
 
   return (
     <>
@@ -146,19 +153,19 @@ function Overview({ issue, onDeleted }: { issue: IssueDetail; onDeleted: () => v
 
       <Section title="Details">
         <dl className="grid grid-cols-2 gap-x-6 gap-y-2 text-sm">
-          {[
+          {([
             ["Reported by", issue.creator_name],
             ["Lead", issue.lead_name ? `${issue.lead_name}${issue.lead_role === "director" ? " (Director)" : ""}` : "—"],
             ["Created", fmtDateTime(issue.created_at)],
             ["Started", fmtDateTime(issue.start_date)],
-            ["Due date", issue.expected_end_date ? `${fmtDate(issue.expected_end_date)} (agreed)` : "Not agreed yet"],
+            ["Due date", dueDate],
             ["Effort", issue.effort],
             ["Root cause", issue.root_cause ?? "—"],
             ["Resolved", issue.resolved_at ? `${fmtDateTime(issue.resolved_at)} by ${issue.resolved_by_name ?? "—"}` : "—"],
             ["Closed", issue.closed_at ? `${fmtDateTime(issue.closed_at)}${issue.closed_by_name ? ` by ${issue.closed_by_name}` : " (auto)"}` : "—"],
             ...(issue.rejected_at ? [["Rejected", `${fmtDateTime(issue.rejected_at)} by ${issue.rejected_by_name ?? "—"}`]] : []),
             ["Participants", issue.participants.map((p) => p.name).join(", ")],
-          ].map(([k, v]) => (
+          ] as [string, ReactNode][]).map(([k, v]) => (
             <div key={k} className="flex gap-2">
               <dt className="w-28 shrink-0 text-muted-foreground">{k}</dt>
               <dd className="font-medium">{v}</dd>
@@ -224,7 +231,8 @@ function LeadControls({ issue, users }: { issue: IssueDetail; users: User[] }) {
         {/* Not a <label>: it holds buttons, which a wrapping label would rename. */}
         <div className="space-y-1">
           <span className="text-xs text-muted-foreground">Due date (SLA)</span>
-          <DueDateControl issue={issue} onSet={(expected_end_date) => patch.mutate({ expected_end_date })} />
+          <DueDateControl issue={issue}
+            onSet={(expected_end_date, due_date_reason) => patch.mutate({ expected_end_date, due_date_reason })} />
         </div>
       </div>
       <div className="mt-2 flex flex-wrap items-center gap-x-6 gap-y-2 rounded-xl border p-3 text-sm"

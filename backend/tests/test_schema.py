@@ -67,6 +67,16 @@ def test_trigram_extension_and_index(conn):
     assert conn.execute("select 1 from pg_indexes where indexname = 'issues_title_trgm_idx'").fetchone()
 
 
+def test_due_date_request_kinds(conn):
+    names = {r[0] for r in conn.execute(
+        "select conname from pg_constraint where conrelid = 'public.due_date_requests'::regclass")}
+    assert {"due_date_requests_kind_check", "due_date_requests_from_date_kind_check"} <= names
+    nullable = conn.execute(
+        "select is_nullable from information_schema.columns where table_schema = 'public' "
+        "and table_name = 'due_date_requests' and column_name = 'from_date'").fetchone()[0]
+    assert nullable == "YES"
+
+
 def test_storage_bucket_private(conn):
     row = conn.execute("select public from storage.buckets where id = 'issue-attachments'").fetchone()
     assert row is not None and row[0] is False
